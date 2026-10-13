@@ -5,7 +5,7 @@ import {BEATS, beatsIn, pulse} from '../timing';
 import {Battery, Moon, StatusBar} from '../ui/StatusBar';
 import {Notification, Notif} from '../ui/Notification';
 import {TokTicLogo} from '../ui/TokTicLogo';
-import {FaceWorld, LightsWorld, PartyWorld, ReflectionWorld, Still} from '../ui/Worlds';
+import {FaceWorld, KenBurns, LightsWorld, PartyWorld, ReflectionWorld, Still} from '../ui/Worlds';
 import {keys, ramp} from '../util';
 import {T, batteryAt, clockAt} from './cues';
 
@@ -629,7 +629,9 @@ const DeadScreen: React.FC<{t: number}> = ({t}) => {
 	return (
 		<AbsoluteFill style={{background: '#000'}}>
 			<AbsoluteFill style={{opacity: reflection * (1 - party)}}>
-				<Still id="S6" fallback={<ReflectionWorld t={t} />} />
+				<KenBurns t={t} start={T.clear} end={T.rebuild + 3} from={{scale: 1.18, x: 2}} to={{scale: 1.05, x: -2}}>
+					<Still id="S6" fallback={<ReflectionWorld t={t} />} />
+				</KenBurns>
 			</AbsoluteFill>
 			<AbsoluteFill style={{opacity: party * (1 - face), filter: `blur(${16 * (1 - focus)}px)`, transform: `scale(${1.1 - 0.1 * focus})`}}>
 				<Still id="S2" fallback={<PartyWorld t={t} />} />

@@ -88,13 +88,16 @@ Implications:
 
 ## 0% treatment (decided): Maya, 19, lives through her phone; the battery dies; she looks up and comes alive
 - Core trick: the first half plays as a phone screen recording (motion graphics UI). The phone frame shatters into full screen at the 1:24 "Flatline".
-- After the breakout, the real world is a flash "photo dump" of AI stills cut to the beat.
+- After the breakout, the real world is a run of AI stills cut to the beat.
+  - Revised by Tom on 2026-10-13: the stills should look like a top music-video photographer shot them. Stylish, light and beautiful; never trashy party snaps.
+  - Each still moves (Ken Burns push or drift, parallax or light leaks where they suit). The `KenBurns` component is in src/ui/Worlds.tsx.
+  - Every shot with a group includes at least one Black, one East Asian and one South Asian (Indian) young adult in a diverse, attractive cast.
 - Use a fictional app called "TokTic" (Tom, 2026-10-13: a deliberate jab at TikTok; "LOOP" was dropped because it is a real app). No real Instagram, TikTok or Apple UI or logos, and keep TokTic's colours away from TikTok's cyan/red/black.
 - End card: "You don't have to die to wake up." Project Profound. Add 3–4 s after 3:32.
 - Formats: 16:9 master (phone frame in the center, expanding at the breakout) plus a 9:16 vertical. Cutdowns: 15 s (0:45–1:36) and 30 s.
 - Image style anchors:
   - Screen world: "cinematic, cold blue phone-screen light, shallow depth of field, 35mm"
-  - Real world: "disposable camera flash photo, party candid, warm, grainy, motion blur, Gen Z photo dump aesthetic"
+  - Real world (revised 2026-10-13): editorial music-video still by a top fashion photographer, warm Edison-bulb light and haze in an elegant industrial loft, light and joyful, fine film grain. The full wording is in docs/image-prompts.md.
   - Keep Maya's face mostly from behind, in profile or blurred, so she stays consistent.
 - Images: up to 20, about 16 planned:
   - Screen world: face lit blue by the phone; party seen through the camera; 4 feed thumbnails; five friends on a couch lit by phones; her reflection in a cracked black screen.
@@ -174,7 +177,7 @@ Implications:
 3. Done (2026-10-13): first test render of the screen-world opening, 0:00 to 1:26.6 (it runs to the downbeat after the breakout so the shatter plays out). Images are procedural stand-ins. Waiting on Tom's notes.
 4. Done (2026-10-13): all 17 stills generated on Runway with nano_banana_2.1 (Tom's pick, 6 credits each at 2752:1536), with M0 as the reference for the Maya shots. R6 was retaken once (the first take showed an Apple logo and face-up phones). Sent to Tom as full-resolution JPEGs for the Drive folder; the Drive tools can't upload images. Runway balance after: 348 credits.
    - A new session has no media: download the stills from Drive into media/stills/ and copy them to public/stills/ as <ID>.png or .jpg (git-ignored).
-   - Known small issues, left as is: R4 has a "NEW YORK" T-shirt; R7 is a selfie Maya takes herself (the brief said someone else takes it); three phones in R6 lie face-up with their screens off.
+   - Restyle (Tom, 2026-10-13): R1 and R2 cut; S2, S5 and R3–R10 regenerated in the editorial style with the diverse cast (60 credits). The first-round images are in media/stills/v1/. Drop 1 now opens on R8. Small leftovers: beer bottles on the R10 rooftop; a light phone screen in S2. Balance after: 288 credits.
 5. Build drop 1 onwards: the photo dump, the kinetic type, the end card.
 
 ## Remotion build

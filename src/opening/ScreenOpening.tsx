@@ -3,7 +3,7 @@ import {AbsoluteFill, Audio, Easing, getStaticFiles, random, staticFile, useCurr
 import {C, DISPLAY_FONT, PHONE_H, PHONE_W} from '../theme';
 import {BEATS, FPS, lastBeatIndex, pulse} from '../timing';
 import {Phone} from '../ui/Phone';
-import {PartyWorld, RealWorld, Still} from '../ui/Worlds';
+import {KenBurns, PartyWorld, RealWorld, Still} from '../ui/Worlds';
 import {keys, ramp} from '../util';
 import {T} from './cues';
 import {PhoneScreen} from './ScreenScenes';
@@ -201,9 +201,10 @@ export const ScreenOpening: React.FC<OpeningProps> = ({debug}) => {
 				</Phone>
 			) : (
 				<>
-					<AbsoluteFill style={{transform: `scale(${1.15 - 0.15 * ramp(t, T.drop, T.drop + 0.6)})`}}>
-						<Still id="R1" fallback={<RealWorld t={t} />} />
-					</AbsoluteFill>
+					{/* first real-world photo: punches in on the drop, then a slow upward drift with the hands */}
+					<KenBurns t={t} start={T.drop} end={T.end + 2} from={{scale: 1.06, y: 1.5}} to={{scale: 1.14, y: -1.5}} punch={0.12}>
+						<Still id="R8" fallback={<RealWorld t={t} />} />
+					</KenBurns>
 					<Shatter t={t} scale={phoneScale} />
 					<AbsoluteFill style={{background: '#fff', opacity: flash}} />
 				</>

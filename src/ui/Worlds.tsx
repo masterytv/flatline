@@ -140,3 +140,27 @@ export const Grain: React.FC<{opacity?: number}> = ({opacity = 0.18}) => {
 		</svg>
 	);
 };
+
+type Frame = {scale: number; x?: number; y?: number};
+
+/**
+ * Slow camera move over a still: eased push/pull and pan between two framings.
+ * x and y are percentages of the frame. An optional `punch` adds a quick settle on the cut.
+ */
+export const KenBurns: React.FC<{
+	t: number;
+	start: number;
+	end: number;
+	from: Frame;
+	to: Frame;
+	punch?: number;
+	children: React.ReactNode;
+}> = ({t, start, end, from, to, punch = 0, children}) => {
+	const k = Math.min(1, Math.max(0, (t - start) / (end - start)));
+	const e = k * k * (3 - 2 * k); // smoothstep
+	const settle = punch * Math.exp(-Math.max(0, t - start) / 0.18);
+	const scale = from.scale + (to.scale - from.scale) * e + settle;
+	const x = (from.x ?? 0) + ((to.x ?? 0) - (from.x ?? 0)) * e;
+	const y = (from.y ?? 0) + ((to.y ?? 0) - (from.y ?? 0)) * e;
+	return <AbsoluteFill style={{transform: `scale(${scale}) translate(${x}%, ${y}%)`}}>{children}</AbsoluteFill>;
+};
