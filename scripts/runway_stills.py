@@ -25,7 +25,21 @@ OUT = os.path.join(ROOT, 'media', 'stills')
 PUB = os.path.join(ROOT, 'public', 'stills')
 
 
-def call(method, path, body=None):
+def call(method, path, body=None, tries=4):
+    # GETs are retried on dropped connections; a POST is not, so a task is never paid for twice.
+    n = tries if method == 'GET' else 1
+    for attempt in range(n):
+        try:
+            return _call(method, path, body)
+        except urllib.error.HTTPError:
+            raise
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if attempt == n - 1:
+                raise
+            time.sleep(2 ** attempt)
+
+
+def _call(method, path, body=None):
     req = urllib.request.Request(API + path, method=method, data=json.dumps(body).encode() if body else None)
     req.add_header('Authorization', f'Bearer {KEY}')
     req.add_header('X-Runway-Version', '2024-11-06')
@@ -34,7 +48,7 @@ def call(method, path, body=None):
         with urllib.request.urlopen(req, context=CTX, timeout=60) as r:
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
-        raise RuntimeError(f'{method} {path}: {e.code} {e.read().decode()[:500]}')
+        raise urllib.error.HTTPError(e.url, e.code, f'{method} {path}: {e.code} {e.read().decode()[:500]}', e.headers, None) from None
 
 
 def prompts():
