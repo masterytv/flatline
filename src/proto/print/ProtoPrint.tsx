@@ -13,6 +13,9 @@ import {Couch, PopUp} from './s_couch';
 import {Table} from './s_table';
 import {Diptych, Hoist} from './s_diptych';
 import {bt} from '../../timing';
+import {Light, NoPain, Strips, TimeCard} from './s_groove';
+import {Receipt, TearOff} from './s_back';
+import {Dawn, EndCard, LivingLine, Postcard} from './s_outro';
 
 type Sec = {from: number; to: number; C: React.FC<{t: number}>; name: string};
 
@@ -36,17 +39,28 @@ const base: Sec[] = [
 	{from: F.flatline3, to: F.couch, C: ReversePull, name: 'reverse pull'},
 	{from: F.couch, to: F.join, C: Couch, name: 'S5 stencils'},
 	{from: F.join, to: F.groove, C: PopUp, name: 'pop-up'},
-	{from: F.drop3, to: F.type2, C: Table, name: 'R6 table'},
+	{from: F.groove, to: F.light, C: NoPain, name: 'no pain poster'},
+	{from: F.light, to: F.fourMin, C: Light, name: 'S3 light'},
+	{from: F.fourMin, to: F.together, C: TimeCard, name: 'time card'},
+	{from: F.together, to: F.beep1, C: Strips, name: 'R4 strips'},
+	{from: F.beep1, to: F.alive, C: Receipt, name: 'receipt'},
+	{from: F.alive, to: F.table, C: TearOff, name: 'R13 tear-off'},
+	{from: F.table, to: F.type2, C: Table, name: 'R6 table'},
 	{from: F.type2, to: F.type3, C: Diptych, name: 'diptych'},
 	{from: F.type3, to: bt(101, 2), C: Hoist, name: 'hoist'},
 	{from: bt(101, 2), to: 191.019, C: Macros, name: 'macros'},
 	{from: 191.019, to: F.dancing2, C: R9Pull, name: 'R9 pull / still'},
-	{from: F.dancing2, to: F.slow, C: Explosion, name: 'dots explode'},
+	{from: F.dancing2, to: F.dawn, C: Explosion, name: 'dots explode / keepsake'},
+	{from: F.dawn, to: F.screenTime, C: Dawn, name: 'R10 dawn'},
+	{from: F.screenTime, to: F.stillDancing, C: Postcard, name: 'R11 postcard'},
+	{from: F.stillDancing, to: F.songEnd, C: LivingLine, name: 'living line'},
+	{from: F.songEnd, to: F.endCardOut + 1, C: EndCard, name: 'end card'},
 ];
 
 export const ProtoPrint: React.FC<{debug?: boolean}> = ({debug}) => {
 	const frame = useCurrentFrame();
-	const t = frame / FPS;
+	// Evaluate cues at mid-frame so a cue at time c first shows on frame round(c × 30), per CLAUDE.md.
+	const t = (frame + 0.5) / FPS;
 	if (t < T.end) return <AbsoluteFill style={{background: '#000'}} />;
 	const list = SECTIONS.length ? SECTIONS : base;
 	const sec = list.find((s) => t >= s.from && t < s.to);

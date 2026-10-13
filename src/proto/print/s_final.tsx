@@ -7,6 +7,7 @@ import {ANTON, hash2, INK} from './ink';
 import {clamp01, CropMarks, easeInOut, easeOut, inked, kickNudge, RegTarget, Rule, Slug, stamp} from './kit';
 import {Cam, CAM0, Plate, plateDots, Sheet, sheetMatrix} from './press';
 import {CamLayer, Paper, Press} from './Press';
+import {KeepsakePrint} from './s_outro';
 
 // 3:07.8–3:18.3: macro proofs of R5 on the beat, then R9 pulled plate by plate, frozen half-printed on "Still",
 // and on "Dancing" (the loudest beat) every halftone dot tears loose.
@@ -106,7 +107,7 @@ export const R9Pull: React.FC<{t: number}> = ({t}) => {
 				{st.on && (
 					<svg
 						viewBox={`0 0 ${R9S.w * (1 - STOP) - 50} 700`}
-						style={{position: 'absolute', left: sx + R9S.w * STOP + 34, top: sy + 120, width: R9S.w * (1 - STOP) - 50, height: 700, overflow: 'visible', transform: `scale(${st.s})`, transformOrigin: '50% 60%', mixBlendMode: 'multiply', ...inked(900, 11, 70)}}
+						style={{position: 'absolute', left: sx + R9S.w * STOP + 34, top: sy + 120, width: R9S.w * (1 - STOP) - 50, height: 700, overflow: 'visible', transform: `scale(${st.s})`, transformOrigin: '50% 60%', mixBlendMode: 'multiply', ...inked(900, 11, 70, true)}}
 					>
 						<text x={0} y={640} fontFamily="Anton" fontSize={820} textLength={R9S.w * (1 - STOP) - 50} lengthAdjust="spacingAndGlyphs" fill={INK.key}>
 							STILL
@@ -255,7 +256,7 @@ export const Explosion: React.FC<{t: number}> = ({t}) => {
 							opacity: word,
 							transform: `scale(${(1 + bounce * 0.035) * wst.s})`,
 							mixBlendMode: 'multiply',
-							...inked(900, 70, 20),
+							...inked(900, 70, 20, true),
 						}}
 					>
 						DANCING
@@ -266,6 +267,7 @@ export const Explosion: React.FC<{t: number}> = ({t}) => {
 			<CamLayer cam={cam}>
 				<Rule x={140} y={1010} w={1640} t={t} amp={26} />
 			</CamLayer>
+			<KeepsakePrint t={t} />
 		</AbsoluteFill>
 	);
 };

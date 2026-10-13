@@ -34,7 +34,7 @@ const TABLE_C = [R6S.cx - R6S.w / 2 + 0.47 * R6S.w, R6S.cy - R6S.h / 2 + 0.58 * 
 /** A square crop of S2 around a face, sized so the face (eyes to chin) fills the window's short side. */
 const faceCrop = (n: number, S: number, W: number): [number, number, number, number] => {
 	const [fx, fy, fw] = S2_FACES[n];
-	const cs = (fw * 2752 * 1.25 * S) / (W * 1.05);
+	const cs = (fw * 2752 * 0.82 * S) / (W * 1.05);
 	const cw = cs / 2752;
 	const ch = cs / 1536;
 	const cx = Math.min(1 - cw / 2, Math.max(cw / 2, fx));
@@ -64,8 +64,8 @@ export const Table: React.FC<{t: number}> = ({t}) => {
 							seed: 6,
 							plates: [
 								// the table recedes: a light orange field with only the deepest shadows in key
-								{ch: 1, ink: INK.heat, angle: 15, cell: 10, dx: 2 + kx, dy: -1 + ky, gain: 0.72, gamma: 1.2},
-								{ch: 0, ink: INK.key, angle: 45, cell: 10, gain: 0.55, gamma: 2.2},
+								{ch: 1, ink: INK.heat, angle: 15, cell: 11, dx: 2 + kx, dy: -1 + ky, gain: 0.6, gamma: 1.3},
+								{ch: 0, ink: INK.key, angle: 45, cell: 11, gain: 0.45, gamma: 2.4},
 							],
 						},
 					]}
@@ -115,8 +115,8 @@ export const Table: React.FC<{t: number}> = ({t}) => {
 												h: S,
 												seed: 20 + n,
 												plates: [
-													{ch: 1, ink: INK.heat, angle: 15, cell: 4.2, dx: 1},
-													{ch: 0, ink: INK.key, angle: 45, cell: 4.2, gain: 0.8, gamma: 1.2},
+													{ch: 1, ink: INK.heat, angle: 15, cell: 4.6, dx: 1},
+													{ch: 0, ink: INK.key, angle: 45, cell: 4.6, gain: 0.8, gamma: 1.2},
 												],
 											}}
 											res={1.5}

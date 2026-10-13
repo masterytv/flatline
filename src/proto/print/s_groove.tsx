@@ -68,7 +68,7 @@ export const NoPoster: React.FC<{t: number; zoom?: number}> = ({t, zoom = 1}) =>
 			const s = stamp(t, F.noWords[i]);
 			if (!s.on) return null;
 			return (
-				<div key={l} style={{position: 'absolute', left: 120, top: LINE_Y(i), fontFamily: ANTON, fontSize: FONT, lineHeight: 1, color: LINE_INK[i], mixBlendMode: 'multiply', transform: `scale(${s.s})`, transformOrigin: '0 50%', ...inked(900, i * 40, i * 13)}}>
+				<div key={l} style={{position: 'absolute', left: 120, top: LINE_Y(i), fontFamily: ANTON, fontSize: FONT, lineHeight: 1, color: LINE_INK[i], mixBlendMode: 'multiply', transform: `scale(${s.s})`, transformOrigin: '0 50%', ...inked(900, i * 40, i * 13, true)}}>
 					{l}
 				</div>
 			);

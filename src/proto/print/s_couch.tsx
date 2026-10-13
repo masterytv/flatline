@@ -162,7 +162,7 @@ export const PopUp: React.FC<{t: number}> = ({t}) => {
 							<Paper x={0} y={0} w={S5S.w} h={S5S.h} />
 						</div>
 						{full.map((s, n) => (
-							<SheetCanvas key={n} sheet={{...s, plates: s.plates.map((p) => ({...p, mask: (u: number, v: number) => (anyPerson(u, v) ? 0.25 : 1) * (p.mask ? p.mask(u, v) : 1)}))}} res={0.6} />
+							<SheetCanvas key={n} sheet={{...s, ground: n === 0 ? INK.paper : undefined, plates: s.plates.map((p) => ({...p, mask: (u: number, v: number) => (anyPerson(u, v) ? 0.25 : 1) * (p.mask ? p.mask(u, v) : 1)}))}} res={0.6} blend={false} />
 						))}
 					</div>
 					{/* the sofa layer: each friend a pull-tab that stands up and bobs */}

@@ -108,7 +108,7 @@ export const PressHit: React.FC<{t: number}> = ({t}) => {
 							transform: `rotate(-1.4deg) scale(${title.s})`,
 							transformOrigin: '30% 70%',
 							mixBlendMode: 'multiply',
-							...inked(900, 13, 40),
+							...inked(900, 13, 40, true),
 						}}
 					>
 						0%
@@ -205,11 +205,11 @@ export const Heart: React.FC<{t: number}> = ({t}) => {
 		<AbsoluteFill style={{background: INK.paper}}>
 			<CamLayer cam={cam}>
 				<Paper />
-				<div style={{position: 'absolute', left: 150, top: 70, fontFamily: ANTON, fontSize: 250, lineHeight: 1, color: INK.key, mixBlendMode: 'multiply', transform: `scale(${my.s})`, transformOrigin: '0 50%', ...inked(900, 3, 9)}}>
+				<div style={{position: 'absolute', left: 150, top: 70, fontFamily: ANTON, fontSize: 250, lineHeight: 1, color: INK.key, mixBlendMode: 'multiply', transform: `scale(${my.s})`, transformOrigin: '0 50%', ...inked(900, 3, 9, true)}}>
 					MY HEART
 				</div>
 				{st.on && (
-					<div style={{position: 'absolute', left: 150, top: 330, fontFamily: ANTON, fontSize: 250, lineHeight: 1, color: INK.heat, mixBlendMode: 'multiply', transform: `scale(${st.s})`, transformOrigin: '0 50%', ...inked(900, 40, 2)}}>
+					<div style={{position: 'absolute', left: 150, top: 330, fontFamily: ANTON, fontSize: 250, lineHeight: 1, color: INK.heat, mixBlendMode: 'multiply', transform: `scale(${st.s})`, transformOrigin: '0 50%', ...inked(900, 40, 2, true)}}>
 						STOPPED
 					</div>
 				)}

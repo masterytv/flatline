@@ -115,14 +115,14 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 		<AbsoluteFill style={{background: INK.paper, transform: `translate(${shake}px, ${shake * 0.5}px)`}}>
 			<Paper />
 			{st1.on && (
-				<div style={{position: 'absolute', left: 110, top: 70, fontFamily: ANTON, fontSize: 210, lineHeight: 0.98, color: INK.key, mixBlendMode: 'multiply', transform: `scale(${st1.s})`, transformOrigin: '0 50%', ...inked(900, 5, 5)}}>
+				<div style={{position: 'absolute', left: 110, top: 70, fontFamily: ANTON, fontSize: 210, lineHeight: 0.98, color: INK.key, mixBlendMode: 'multiply', transform: `scale(${st1.s})`, transformOrigin: '0 50%', ...inked(900, 5, 5, true)}}>
 					MY HEART
 					<br />
 					STOPPED
 				</div>
 			)}
 			{st2.on && (
-				<div style={{position: 'absolute', left: 110, top: 520, fontFamily: ANTON, fontSize: 150, lineHeight: 1, color: INK.heat, mixBlendMode: 'multiply', transform: `scale(${st2.s})`, transformOrigin: '0 50%', ...inked(900, 50, 5)}}>
+				<div style={{position: 'absolute', left: 110, top: 520, fontFamily: ANTON, fontSize: 150, lineHeight: 1, color: INK.heat, mixBlendMode: 'multiply', transform: `scale(${st2.s})`, transformOrigin: '0 50%', ...inked(900, 50, 5, true)}}>
 					AND I STARTED
 				</div>
 			)}
@@ -151,7 +151,7 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 				</>
 			)}
 			{st3.on && (
-				<div style={{position: 'absolute', left: cx - R14P.w / 2 - 30, top: y + R14P.h - 190, width: R14P.w + 60, textAlign: 'center', fontFamily: ANTON, fontSize: 190, lineHeight: 1, color: INK.key, mixBlendMode: 'multiply', transform: `scale(${st3.s})`, ...inked(900, 9, 9)}}>
+				<div style={{position: 'absolute', left: cx - R14P.w / 2 - 30, top: y + R14P.h - 190, width: R14P.w + 60, textAlign: 'center', fontFamily: ANTON, fontSize: 190, lineHeight: 1, color: INK.key, mixBlendMode: 'multiply', transform: `scale(${st3.s})`, ...inked(900, 9, 9, true)}}>
 					DANCING
 				</div>
 			)}
