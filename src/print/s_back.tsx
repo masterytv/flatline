@@ -1,8 +1,8 @@
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
-import {F} from '../../full/cues';
-import {beatsIn, bt} from '../../timing';
-import {TokTicLogo} from '../../ui/TokTicLogo';
+import {F} from '../full/cues';
+import {beatsIn, bt} from '../timing';
+import {TokTicLogo} from '../ui/TokTicLogo';
 import {useDensities} from './density';
 import {INK, MONO, SERIF} from './ink';
 import {clamp01, easeIn, easeInOut, ecg, kickNudge, Slug} from './kit';

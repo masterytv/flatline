@@ -1,13 +1,13 @@
 import React, {useMemo} from 'react';
 import {AbsoluteFill} from 'remotion';
-import {F} from '../../full/cues';
-import {bt} from '../../timing';
+import {F} from '../full/cues';
+import {bt} from '../timing';
 import {Density, useDensities} from './density';
 import {ANTON, hash2, INK} from './ink';
 import {clamp01, CropMarks, easeInOut, easeOut, inked, kickNudge, RegTarget, Rule, Slug, stamp} from './kit';
 import {Cam, CAM0, Plate, plateDots, Sheet, sheetMatrix} from './press';
 import {CamLayer, Paper, Press} from './Press';
-import {KeepsakePrint} from './s_outro';
+import {KeepsakePrint} from './s_keepsake';
 
 // 3:07.8–3:18.3: macro proofs of R5 on the beat, then R9 pulled plate by plate, frozen half-printed on "Still",
 // and on "Dancing" (the loudest beat) every halftone dot tears loose.

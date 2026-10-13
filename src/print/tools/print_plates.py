@@ -1,13 +1,13 @@
 """Proof of Life: derive ink-density maps (not new images) from the existing stills.
 
-For each still, writes src/proto/print/plates/<ID>.png, an RGB density map at 1376x768:
+For each still, writes public/plates/<ID>.png, an RGB density map at 1376x768:
   R = key (warm black) density, G = HEAT (orange) density, B = COLD (ultramarine) density.
 The prototype screens these live in a canvas (dots or lines at any cell size, angle and zoom),
 so one map per still serves the poster, the macro crops and the dot confetti.
 
 Also writes paper.png (newsprint fibre) and speckle.png (ink voids for riso-style coverage).
 
-Usage: python3 src/proto/print/tools/print_plates.py [IDs...]
+Usage: python3 src/print/tools/print_plates.py [IDs...]   (no IDs: paper textures plus every still in public/stills)
 Files are git-ignored (derived media). Nothing here generates new imagery.
 """
 import os
@@ -16,9 +16,9 @@ import sys
 import numpy as np
 from PIL import Image, ImageFilter
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 SRC = os.path.join(ROOT, 'public', 'stills')
-OUT = os.path.join(os.path.dirname(__file__), '..', 'plates')
+OUT = os.path.join(ROOT, 'public', 'plates')
 W, H = 1376, 768
 
 # Per-still tuning: local-contrast mix, key threshold, colour-plate ceiling, gamma, warmth weighting.
@@ -115,7 +115,7 @@ def paper():
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    ids = sys.argv[1:] or ['R8', 'R3', 'S5', 'R6', 'S2', 'S1', 'R12', 'R9', 'R5', 'R14', 'R4', 'R13', 'R7', 'R10', 'R11', 'S3']
+    ids = sys.argv[1:] or sorted({f.split('.')[0] for f in os.listdir(SRC) if f.split('.')[-1] in ('png', 'jpg', 'jpeg', 'webp')})
     if 'paper' in ids or not sys.argv[1:]:
         paper()
     for i in ids:

@@ -1,7 +1,7 @@
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
-import {F} from '../../full/cues';
-import {BEATS, bt, lastBeatIndex} from '../../timing';
+import {F} from '../full/cues';
+import {BEATS, bt, lastBeatIndex} from '../timing';
 import {useDensities} from './density';
 import {ANTON, INK, MONO, SERIF} from './ink';
 import {clamp01, easeIn, easeInOut, easeOut, inked, Rule, Slug, stamp} from './kit';

@@ -1,13 +1,12 @@
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
-import {F} from '../../full/cues';
-import {BEATS, bt, lastBeatIndex} from '../../timing';
+import {F} from '../full/cues';
+import {BEATS, bt, lastBeatIndex} from '../timing';
 import {useDensities} from './density';
 import {INK, SERIF} from './ink';
-import {clamp01, easeInOut, easeOut, inked, kickNudge, Rule, Slug, stamp} from './kit';
+import {clamp01, easeInOut, easeOut, FlatlineBar, inked, kickNudge, Rule, Sketch, Slug, stamp} from './kit';
 import {Cam} from './press';
 import {CamLayer, Paper, Press} from './Press';
-import {FlatlineBar} from './s_drop';
 
 // 1:41.4 "...dancing": DANCING slams across the frame, the page floods black, and the letters are the only
 // windows onto R3. Then the word scales through the N–C gap until R3 fills the frame.
@@ -118,3 +117,6 @@ export const ReversePull: React.FC<{t: number}> = ({t}) => {
 export const Aside: React.FC<{text: string; x: number; y: number; size?: number; o?: number}> = ({text, x, y, size = 64, o = 1}) => (
 	<div style={{position: 'absolute', left: x, top: y, fontFamily: SERIF, fontStyle: 'italic', fontSize: size, color: INK.key, opacity: o, mixBlendMode: 'multiply', whiteSpace: 'nowrap'}}>{text}</div>
 );
+
+// 1:45.1–1:54.3 (bars 56–60): her first dance, a new print every downbeat.
+export const FirstDance = Sketch('first dance');

@@ -1,12 +1,12 @@
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
-import {F} from '../../full/cues';
-import {T} from '../../opening/cues';
-import {bt} from '../../timing';
-import {KenBurns, RealWorld, Still} from '../../ui/Worlds';
+import {F} from '../full/cues';
+import {T} from '../opening/cues';
+import {bt} from '../timing';
+import {KenBurns, RealWorld, Still} from '../ui/Worlds';
 import {useDensities} from './density';
 import {ANTON, INK, MONO, SERIF} from './ink';
-import {BatteryGlyph, clamp01, ColorBar, CropMarks, easeOut, inked, kickNudge, lerp, RegTarget, Rule, slap, Slug, stamp, Tape} from './kit';
+import {BatteryGlyph, clamp01, ColorBar, CropMarks, easeOut, FlatlineBar, inked, kickNudge, lerp, RegTarget, Rule, slap, Slug, stamp, Tape} from './kit';
 import {Cam, Plate, Sheet} from './press';
 import {CamLayer, Paper, Press} from './Press';
 
@@ -151,21 +151,6 @@ const PROGS: {paper?: string; plates: [string | null, string | null]; mis: numbe
 	{plates: [INK.key, INK.heat], mis: 0}, // 50.4: all plates in perfect register
 ];
 const PROG_T = [bt(49), bt(49, 2), bt(49, 3), bt(49, 4), bt(50), bt(50, 2), bt(50, 3), bt(50, 4)];
-
-export const FlatlineBar: React.FC<{x: number; y: number; w: number; h: number; text: string; size: number; paper?: string; s?: number; ink?: string}> = ({x, y, w, h, text, size, s = 1, ink = INK.key, paper}) => (
-	<svg style={{position: 'absolute', left: x, top: y, width: w, height: h, overflow: 'visible', transform: `scale(${s})`, mixBlendMode: 'multiply', ...inked(800, 31, 7, true)}} viewBox={`0 0 ${w} ${h}`}>
-		<defs>
-			<mask id={`ko-${text}-${w}`}>
-				<rect width={w} height={h} fill="white" />
-				<text x={w / 2} y={h / 2 + size * 0.36} textAnchor="middle" fontFamily="Anton" fontSize={size} letterSpacing={size * 0.04} fill="black">
-					{text}
-				</text>
-			</mask>
-		</defs>
-		{paper && <rect width={w} height={h} fill={paper} />}
-		<rect width={w} height={h} fill={ink} mask={`url(#ko-${text}-${w})`} />
-	</svg>
-);
 
 export const Progs: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['R8']);

@@ -1,31 +1,14 @@
 import {useEffect, useState} from 'react';
-import {continueRender, delayRender} from 'remotion';
+import {continueRender, delayRender, staticFile} from 'remotion';
 
 /**
- * Ink-density maps made by tools/print_plates.py from the existing stills (R = key, G = heat, B = cold).
- * They are screened live by the press, so one map serves posters, macro crops and the dot confetti.
+ * Ink-density maps made by tools/print_plates.py from the stills (R = key, G = heat, B = cold), read from
+ * public/plates/<ID>.png at render time. They are screened live by the press, so one map serves posters,
+ * macro crops and the dot confetti. A missing plate prints as bare paper (and logs) instead of stopping the render.
  */
-const URLS: Record<string, string> = {
-	R3: new URL('./plates/R3.png', import.meta.url).href,
-	R4: new URL('./plates/R4.png', import.meta.url).href,
-	R5: new URL('./plates/R5.png', import.meta.url).href,
-	R6: new URL('./plates/R6.png', import.meta.url).href,
-	R7: new URL('./plates/R7.png', import.meta.url).href,
-	R8: new URL('./plates/R8.png', import.meta.url).href,
-	R9: new URL('./plates/R9.png', import.meta.url).href,
-	R10: new URL('./plates/R10.png', import.meta.url).href,
-	R11: new URL('./plates/R11.png', import.meta.url).href,
-	R12: new URL('./plates/R12.png', import.meta.url).href,
-	R13: new URL('./plates/R13.png', import.meta.url).href,
-	R14: new URL('./plates/R14.png', import.meta.url).href,
-	S1: new URL('./plates/S1.png', import.meta.url).href,
-	S2: new URL('./plates/S2.png', import.meta.url).href,
-	S3: new URL('./plates/S3.png', import.meta.url).href,
-	S5: new URL('./plates/S5.png', import.meta.url).href,
-};
-
-export const PAPER_URL = new URL('./plates/paper.jpg', import.meta.url).href;
-export const SPECKLE_URL = new URL('./plates/speckle.png', import.meta.url).href;
+export const plateUrl = (id: string) => staticFile(`plates/${id}.png`);
+export const PAPER_URL = staticFile('plates/paper.jpg');
+export const SPECKLE_URL = staticFile('plates/speckle.png');
 
 export type Density = {id: string; w: number; h: number; data: Uint8ClampedArray};
 
@@ -47,13 +30,18 @@ const load = (id: string): Promise<Density> => {
 	if (hit) return Promise.resolve(hit);
 	let p = pending.get(id);
 	if (!p) {
-		p = loadImage(URLS[id]).then((img) => {
+		p = loadImage(plateUrl(id)).then((img) => {
 			const c = document.createElement('canvas');
 			c.width = img.naturalWidth;
 			c.height = img.naturalHeight;
 			const ctx = c.getContext('2d', {willReadFrequently: true})!;
 			ctx.drawImage(img, 0, 0);
 			const d: Density = {id, w: c.width, h: c.height, data: ctx.getImageData(0, 0, c.width, c.height).data};
+			cache.set(id, d);
+			return d;
+		}, () => {
+			console.error(`plate ${id} is missing: run python3 src/print/tools/print_plates.py`);
+			const d: Density = {id, w: 2, h: 2, data: new Uint8ClampedArray(16)};
 			cache.set(id, d);
 			return d;
 		});

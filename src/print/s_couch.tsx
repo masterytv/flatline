@@ -1,14 +1,13 @@
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
-import {F} from '../../full/cues';
-import {BEATS, bt, lastBeatIndex} from '../../timing';
+import {F} from '../full/cues';
+import {BEATS, bt, lastBeatIndex} from '../timing';
 import {Density, useDensities} from './density';
 import {INK} from './ink';
-import {clamp01, CropMarks, easeInOut, easeOut, kickNudge, Rule, Slug} from './kit';
+import {clamp01, CropMarks, easeInOut, easeOut, FlatlineBar, kickNudge, Rule, Sketch, Slug} from './kit';
 import {bbox, inPoly, Poly, S5_PEOPLE, S5_PHONES} from './masks';
 import {Cam, M, Plate, Sheet, sheetMatrix} from './press';
 import {CamLayer, Paper, Press, SheetCanvas} from './Press';
-import {FlatlineBar} from './s_drop';
 
 // 1:56.1 drop 2: S5 printed cold (ultramarine line screen, the phones holes of bare paper). Maya is already warm;
 // a hand-cut stencil pull warms one friend per glowsOff beat, spreading outward from her, and each phone fills black.
@@ -206,3 +205,6 @@ export const PopUp: React.FC<{t: number}> = ({t}) => {
 		</AbsoluteFill>
 	);
 };
+
+// 2:01.6–2:07.1 (bars 65–67): they join her (replaces the pop-up book).
+export const Join = Sketch('they join her');

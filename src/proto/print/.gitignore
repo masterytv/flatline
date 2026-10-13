@@ -1,6 +1,0 @@
-# Derived print plates and font binaries are local only (never commit media).
-plates/
-*.png
-*.jpg
-*.woff2
-*.mp4

@@ -35,25 +35,3 @@ export const S5_PHONES: Record<keyof typeof S5_PEOPLE, Poly> = {
 	eastAsian: [[0.785, 0.62], [0.81, 0.59], [0.819, 0.598], [0.795, 0.633]],
 	curly: [[0.868, 0.59], [0.895, 0.565], [0.904, 0.574], [0.876, 0.604]],
 };
-
-/** R6, the marble table seen from above: seven face-down phones (corner quads, image fractions). */
-export const R6_PHONES: Poly[] = [
-	[[0.204, 0.467], [0.325, 0.451], [0.33, 0.531], [0.209, 0.548]], // left
-	[[0.246, 0.698], [0.364, 0.557], [0.404, 0.64], [0.286, 0.775]], // lower left
-	[[0.429, 0.636], [0.501, 0.656], [0.471, 0.89], [0.388, 0.851]], // bottom centre
-	[[0.549, 0.64], [0.571, 0.606], [0.696, 0.762], [0.668, 0.83]], // lower right
-	[[0.597, 0.487], [0.739, 0.535], [0.729, 0.625], [0.589, 0.571]], // right
-	[[0.571, 0.41], [0.671, 0.323], [0.704, 0.371], [0.607, 0.448]], // upper right
-	[[0.504, 0.339], [0.568, 0.25], [0.611, 0.275], [0.55, 0.371]], // top
-];
-
-/** S2 faces for the R6 windows: centre x, y and face width (image fractions). Black, East Asian and South Asian guests included. */
-export const S2_FACES: [number, number, number][] = [
-	[0.321, 0.378, 0.075], // laughing, Black
-	[0.518, 0.47, 0.062], // East Asian woman
-	[0.714, 0.42, 0.068], // South Asian man, patterned shirt
-	[0.127, 0.41, 0.055], // smiling woman, left
-	[0.41, 0.4, 0.052], // man behind, centre
-	[0.907, 0.445, 0.055], // woman in profile, right
-	[0.782, 0.39, 0.046], // man at the back
-];

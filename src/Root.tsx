@@ -1,6 +1,7 @@
 import React from 'react';
 import {Composition} from 'remotion';
 import './fonts';
+import './print/fonts';
 import {F} from './full/cues';
 import {Flatline0, FullProps} from './full/Flatline0';
 import {T} from './opening/cues';

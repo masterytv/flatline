@@ -1,9 +1,10 @@
 import React from 'react';
-import {BEATS, beatsIn, lastBeatIndex} from '../../timing';
+import {AbsoluteFill, staticFile} from 'remotion';
+import {BEATS, beatsIn, lastBeatIndex} from '../timing';
 import {INK, MONO, hash2} from './ink';
 
-export const INKMASK_URL = new URL('./plates/inkmask.png', import.meta.url).href;
-export const INKMASK_SOLID_URL = new URL('./plates/inkmask_solid.png', import.meta.url).href;
+export const INKMASK_URL = staticFile('plates/inkmask.png');
+export const INKMASK_SOLID_URL = staticFile('plates/inkmask_solid.png');
 
 /** Uneven ink coverage for DOM ink (type, rules, stamps). `solid` for big floods. */
 export const inked = (size = 1024, x = 0, y = 0, solid = false): React.CSSProperties => ({
@@ -183,3 +184,26 @@ export const BatteryGlyph: React.FC<{x: number; y: number; w?: number; color?: s
 		</svg>
 	);
 };
+
+/** Placeholder for a section that isn't built yet: bare paper and its name. */
+export const Sketch: (name: string) => React.FC<{t: number}> = (name) => () => (
+	<AbsoluteFill style={{background: INK.paper}}>
+		<Slug x={80} y={80} text={`[ ${name} ]`} size={22} />
+	</AbsoluteFill>
+);
+
+/** A solid bar with a word knocked out of it (FLATLINE). */
+export const FlatlineBar: React.FC<{x: number; y: number; w: number; h: number; text: string; size: number; paper?: string; s?: number; ink?: string}> = ({x, y, w, h, text, size, s = 1, ink = INK.key, paper}) => (
+	<svg style={{position: 'absolute', left: x, top: y, width: w, height: h, overflow: 'visible', transform: `scale(${s})`, mixBlendMode: 'multiply', ...inked(800, 31, 7, true)}} viewBox={`0 0 ${w} ${h}`}>
+		<defs>
+			<mask id={`ko-${text}-${w}`}>
+				<rect width={w} height={h} fill="white" />
+				<text x={w / 2} y={h / 2 + size * 0.36} textAnchor="middle" fontFamily="Anton" fontSize={size} letterSpacing={size * 0.04} fill="black">
+					{text}
+				</text>
+			</mask>
+		</defs>
+		{paper && <rect width={w} height={h} fill={paper} />}
+		<rect width={w} height={h} fill={ink} mask={`url(#ko-${text}-${w})`} />
+	</svg>
+);
