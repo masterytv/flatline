@@ -3,18 +3,28 @@ import {AbsoluteFill, Easing, random, useCurrentFrame, useVideoConfig} from 'rem
 import {C, DISPLAY_FONT, PHONE_H, PHONE_W} from '../theme';
 import {BEATS, FPS, lastBeatIndex, pulse} from '../timing';
 import {Phone} from '../ui/Phone';
-import {KenBurns, PartyWorld, RealWorld, Still} from '../ui/Worlds';
+import {KenBurns, PartyWorld, RealWorld, Still, WarmGlow} from '../ui/Worlds';
 import {keys, ramp} from '../util';
-import {T, flipAt} from './cues';
+import {CHAT, CRACK_FLASH, KICK, T, flipAt} from './cues';
 import {FlipPhoto, PhoneScreen} from './ScreenScenes';
 
 export type OpeningProps = {debug: boolean};
 
 const FRAME = 14; // phone bezel, matches Phone
 
-/** Hairline cracks creeping in from the phone's corners during the riser. */
+// The edge cracks jump on the riser's white flash (where they meet), step on 82.024 and build on 83.870.
+const CRACK_STEPS: [number, number][] = [
+	[CRACK_FLASH, 0.5],
+	[KICK.crackStep, 0.68],
+	[KICK.build, 0.92],
+];
+
+/** Hairline cracks creeping in from the phone's corners during the riser, jumping on CRACK_STEPS. */
 const EdgeCracks: React.FC<{t: number}> = ({t}) => {
-	const k = ramp(t, T.riser, T.flatline, Easing.in(Easing.quad));
+	const creep = ramp(t, T.riser, T.flatline, Easing.in(Easing.quad));
+	const step = CRACK_STEPS.reduce((s, [at, v]) => Math.max(s, v * ramp(t, at, at + 0.08, Easing.out(Easing.quad))), 0);
+	const flash = CRACK_STEPS.reduce((f, [at]) => (t >= at ? Math.max(f, Math.exp(-(t - at) / 0.14)) : f), 0);
+	const k = Math.max(creep, step);
 	if (k <= 0) return null;
 	const W = PHONE_W + 2 * FRAME;
 	const H = PHONE_H + 2 * FRAME;
@@ -28,7 +38,7 @@ const EdgeCracks: React.FC<{t: number}> = ({t}) => {
 		[W, H * 0.6, -1, 0],
 	];
 	return (
-		<svg viewBox={`0 0 ${W} ${H}`} style={{position: 'absolute', inset: 0, width: W, height: H, zIndex: 70, overflow: 'visible'}}>
+		<svg viewBox={`0 0 ${W} ${H}`} style={{position: 'absolute', inset: 0, width: W, height: H, zIndex: 70, overflow: 'visible', filter: flash > 0.05 ? `drop-shadow(0 0 ${(8 * flash).toFixed(1)}px rgba(255,255,255,0.9))` : undefined}}>
 			{corners.map(([x, y, dx, dy], i) =>
 				[0, 1, 2].map((j) => {
 					let px = x;
@@ -44,7 +54,7 @@ const EdgeCracks: React.FC<{t: number}> = ({t}) => {
 					}
 					const start = (i * 3 + j) / 21;
 					const g = keys(k, [start * 0.7, start * 0.7 + 0.3], [0, 1]);
-					return <path key={`${i}-${j}`} d={d} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={1.3} pathLength={1} strokeDasharray={1} strokeDashoffset={1 - g} />;
+					return <path key={`${i}-${j}`} d={d} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={1.3 + 1.4 * flash} pathLength={1} strokeDasharray={1} strokeDashoffset={1 - g} />;
 				}),
 			)}
 		</svg>
@@ -174,12 +184,14 @@ export const ScreenOpening: React.FC<OpeningProps> = ({debug}) => {
 	const vertical = height > width;
 	const phoneScale = vertical ? (height * 0.9) / (PHONE_H + 2 * FRAME) : (height * 0.92) / (PHONE_H + 2 * FRAME);
 
-	// The room around the phone: dark, lit by the screen; the party leaks in once the screen dies.
+	// The room around the phone: the procedural party at about 20%, lit by the screen. It dims a step on each
+	// of the two flips after Do Not Disturb; the room photos leak in once the screen dies.
 	const screenGlow = t < T.clear ? 1 - 0.8 * ramp(t, T.fade, T.clear) : 0;
+	const roomBase = 0.2 - 0.05 * CHAT.dims.reduce((s, at) => s + ramp(t, at, at + 0.15), 0);
 	const room = ramp(t, T.rebuild, T.rebuild + 1.5, Easing.inOut(Easing.quad));
 	const roomFocus = ramp(t, T.riser, T.kickOut, Easing.inOut(Easing.quad));
 	const roomDim = ramp(t, T.kickOut, T.kickOut + 1);
-	const shakeAmp = 7 * ramp(t, T.riser, T.flatline, Easing.in(Easing.quad));
+	const shakeAmp = 7 * ramp(t, T.riser, T.flatline, Easing.in(Easing.quad)) * (1 + 0.8 * ramp(t, KICK.build, KICK.build + 0.12));
 	const shakeX = (random(`px${frame}`) - 0.5) * shakeAmp;
 	const shakeY = (random(`py${frame}`) - 0.5) * shakeAmp;
 	const beatThump = t >= T.build && t < T.fade ? pulse(t, 0.1) * 0.012 : 0;
@@ -188,10 +200,10 @@ export const ScreenOpening: React.FC<OpeningProps> = ({debug}) => {
 
 	return (
 		<AbsoluteFill style={{background: '#030406'}}>
-			{/* the party she isn't looking at, barely there until the screen dies */}
-			{/* the room stays out of focus while the photos flip; behind her face it's warm confetti light */}
-			<AbsoluteFill style={{opacity: 0.12 + 0.6 * room * (1 - 0.6 * roomDim), filter: `blur(${t < T.kickOut ? 36 - 14 * roomFocus : 14}px)`, transform: 'scale(1.1)'}}>
-				{flipAt(t) ? <FlipPhoto t={t} blur={0} /> : <Still id={t >= T.kickOut ? 'R5' : 'S2'} small fallback={<PartyWorld t={t} />} />}
+			{/* the party she isn't looking at, barely there until the screen dies (procedural, no photo) */}
+			{/* the room stays out of focus while the photos flip; behind her face it's a procedural warm glow */}
+			<AbsoluteFill style={{opacity: roomBase + (0.72 - roomBase) * room * (1 - 0.6 * roomDim), filter: `blur(${t < T.kickOut ? 36 - 14 * roomFocus : 14}px)`, transform: 'scale(1.1)'}}>
+				{flipAt(t) ? <FlipPhoto t={t} blur={0} w={width} h={height} room /> : t >= T.kickOut ? <WarmGlow t={t} /> : <PartyWorld t={t} />}
 			</AbsoluteFill>
 			<AbsoluteFill style={{background: `radial-gradient(ellipse at 50% 50%, rgba(80,110,255,${0.22 * screenGlow}) 0%, rgba(3,4,6,0) 45%)`}} />
 			{!broken ? (
@@ -200,9 +212,9 @@ export const ScreenOpening: React.FC<OpeningProps> = ({debug}) => {
 				</Phone>
 			) : (
 				<>
-					{/* first real-world photo: punches in on the drop, then a slow upward drift with the hands */}
+					{/* first real-world photo (P1, the drop under the lantern; Flatline0 hands over to Print here instead) */}
 					<KenBurns t={t} start={T.drop} end={T.end + 2} from={{scale: 1.06, y: 1.5}} to={{scale: 1.14, y: -1.5}} punch={0.12}>
-						<Still id="R8" fallback={<RealWorld t={t} />} />
+						<Still id="P1" fallback={<RealWorld t={t} />} />
 					</KenBurns>
 					<Shatter t={t} scale={phoneScale} />
 					<AbsoluteFill style={{background: '#fff', opacity: flash}} />

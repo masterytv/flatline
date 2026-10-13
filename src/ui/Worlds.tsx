@@ -2,25 +2,68 @@ import React from 'react';
 import {AbsoluteFill, getStaticFiles, Img, random, staticFile, useCurrentFrame} from 'remotion';
 import {pulse} from '../timing';
 
+/** Aspect ratios (width / height) of the generated stills: upright for the in-phone shots, wide for the rest. */
+export const UPRIGHT = 1536 / 2752;
+export const WIDE = 2752 / 1536;
+
+/**
+ * The file for a still ID, matched exactly: stills/<ID>.<ext> or stills/<ID>_<name>.<ext>, so O1 never
+ * picks up O10–O19. `small` prefers the 1280px copy from `npm run stills:small` (thumbnails, heavy blur).
+ */
+export const stillFile = (id: string, small = false): string | undefined => {
+	const files = getStaticFiles();
+	if (small) {
+		const copy = files.find((f) => f.name === `stills/small/${id}.jpg`);
+		if (copy) return copy.name;
+	}
+	const exact = new RegExp(`^stills/${id}(_[^/]*)?\\.(png|jpe?g|webp)$`, 'i');
+	return files.find((f) => exact.test(f.name))?.name;
+};
+
 /**
  * A still from public/stills/<ID>[_name].{png,jpg,webp} when the image exists,
  * otherwise a procedural stand-in so the edit can be timed before images arrive.
+ * `position` is the CSS object-position of the cover crop; `label={false}` hides the stand-in tag.
  */
-export const Still: React.FC<{id: string; fallback: React.ReactNode; style?: React.CSSProperties; small?: boolean}> = ({id, fallback, style, small}) => {
-	// `small` prefers the 1280px copy from `npm run stills:small` (thumbnails, heavy blur).
-	const files = getStaticFiles();
-	const file =
-		(small ? files.find((f) => f.name === `stills/small/${id}.jpg`) : undefined) ??
-		files.find((f) => f.name.startsWith(`stills/${id}_`) || f.name.startsWith(`stills/${id}.`));
+export const Still: React.FC<{id: string; fallback: React.ReactNode; style?: React.CSSProperties; small?: boolean; position?: string; label?: boolean}> = ({
+	id,
+	fallback,
+	style,
+	small,
+	position,
+	label = true,
+}) => {
+	const file = stillFile(id, small);
 	if (file) {
-		return <Img src={staticFile(file.name)} style={{position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', ...style}} />;
+		return <Img src={staticFile(file)} style={{position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: position, ...style}} />;
 	}
 	return (
 		<AbsoluteFill style={style}>
 			{fallback}
-			<div style={{position: 'absolute', right: 10, bottom: 8, fontFamily: 'monospace', fontSize: 12, color: 'rgba(255,255,255,0.35)'}}>{id} stand-in</div>
+			{label ? <div style={{position: 'absolute', right: 10, bottom: 8, fontFamily: 'monospace', fontSize: 12, color: 'rgba(255,255,255,0.35)'}}>{id} stand-in</div> : null}
 		</AbsoluteFill>
 	);
+};
+
+/**
+ * Lays out a photo of a known aspect inside a w×h box: cover-fitted, scaled by `zoom`, with the photo's
+ * point (u, v) (fractions of its width and height) at the box centre, clamped so no edge ever shows.
+ * Children fill the photo's own rectangle, so a stand-in pans exactly like the real image would.
+ */
+export const Framed: React.FC<{w: number; h: number; aspect: number; u?: number; v?: number; zoom?: number; children: React.ReactNode}> = ({
+	w,
+	h,
+	aspect,
+	u = 0.5,
+	v = 0.5,
+	zoom = 1,
+	children,
+}) => {
+	const pw = Math.max(w, h * aspect) * zoom;
+	const ph = pw / aspect;
+	const left = Math.min(0, Math.max(w - pw, w / 2 - u * pw));
+	const top = Math.min(0, Math.max(h - ph, h / 2 - v * ph));
+	return <div style={{position: 'absolute', left, top, width: pw, height: ph}}>{children}</div>;
 };
 
 const WARM = ['#FFB547', '#FF7A45', '#FF4D8D', '#FFD27A', '#C45CFF', '#FF9E6B'];
@@ -74,23 +117,30 @@ const Dancers: React.FC<{t: number; color: string; count?: number; lit?: boolean
 	);
 };
 
-/** S2 stand-in: the house party seen in the cold light of the screen world. */
-export const PartyWorld: React.FC<{t: number}> = ({t}) => (
+/** The house party seen in the cold light of the screen world (the room behind the phone, and party stand-ins). */
+export const PartyWorld: React.FC<{t: number; seed?: string}> = ({t, seed = 'party'}) => (
 	<AbsoluteFill style={{background: 'linear-gradient(180deg, #120A1E 0%, #2A1430 55%, #3A1A22 100%)'}}>
-		<Bokeh t={t} seed="party" count={34} minR={14} maxR={60} />
+		<Bokeh t={t} seed={seed} count={34} minR={14} maxR={60} />
 		<Dancers t={t} color="#07060B" />
 		<AbsoluteFill style={{background: 'linear-gradient(180deg, rgba(40,90,200,0.18), rgba(10,20,60,0.25))', mixBlendMode: 'screen'}} />
 	</AbsoluteFill>
 );
 
-/** S3 stand-in: party lights straight at the lens. */
+/** Warm room light and soft bokeh, no figures: the glow behind her face at the kick-out. */
+export const WarmGlow: React.FC<{t: number}> = ({t}) => (
+	<AbsoluteFill style={{background: 'radial-gradient(circle at 50% 45%, #7A3A1E 0%, #3A160E 45%, #120604 100%)'}}>
+		<Bokeh t={t} seed="glow" count={30} minR={20} maxR={80} cold={0.05} opacity={0.75} />
+	</AbsoluteFill>
+);
+
+/** O3 stand-in: party lights straight at the lens. */
 export const LightsWorld: React.FC<{t: number}> = ({t}) => (
 	<AbsoluteFill style={{background: 'radial-gradient(circle at 50% 40%, #3A2340 0%, #0B0812 70%)'}}>
 		<Bokeh t={t} seed="lights" count={22} minR={50} maxR={150} cold={0.3} opacity={0.85} />
 	</AbsoluteFill>
 );
 
-/** S1 stand-in: her profile lit blue from below. */
+/** Maya stand-in (O5, O6, O7, O27): her profile lit blue from below. */
 export const FaceWorld: React.FC<{t: number; lookUp?: number}> = ({t, lookUp = 0}) => (
 	<AbsoluteFill style={{background: 'radial-gradient(circle at 70% 30%, #2A1424 0%, #07070C 60%)'}}>
 		<Bokeh t={t} seed="face" count={14} minR={30} maxR={80} opacity={0.35} />
@@ -112,7 +162,7 @@ export const FaceWorld: React.FC<{t: number; lookUp?: number}> = ({t, lookUp = 0
 	</AbsoluteFill>
 );
 
-/** S6 stand-in: her faint reflection in dead black glass. */
+/** O14 stand-in: her faint reflection in dead black glass. */
 export const ReflectionWorld: React.FC<{t: number}> = ({t}) => (
 	<AbsoluteFill style={{background: '#020203'}}>
 		<AbsoluteFill style={{opacity: 0.22, filter: 'blur(3px)'}}>
@@ -122,7 +172,7 @@ export const ReflectionWorld: React.FC<{t: number}> = ({t}) => (
 	</AbsoluteFill>
 );
 
-/** R-series stand-in: warm, flash-lit party candid. */
+/** Warm, flash-lit party candid stand-in (the real-world photos). */
 export const RealWorld: React.FC<{t: number; seed?: string}> = ({t, seed = 'real'}) => (
 	<AbsoluteFill style={{background: 'radial-gradient(circle at 50% 45%, #E2894E 0%, #7A2E1C 45%, #1E0B08 100%)'}}>
 		<Bokeh t={t} seed={seed} count={26} minR={20} maxR={70} cold={0.05} opacity={0.8} />
