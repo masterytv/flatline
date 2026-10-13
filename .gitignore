@@ -1,0 +1,26 @@
+# Media stays in Google Drive, never in git
+media/
+*.mp3
+*.wav
+*.m4a
+*.aiff
+*.mp4
+*.mov
+*.webm
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.npy
+*.npz
+
+# Build output
+node_modules/
+out/
+build/
+.remotion/
+
+# Secrets
+.env
+.env.*
