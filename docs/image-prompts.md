@@ -11,6 +11,14 @@
 - **Motion in the edit:** the stills are not shown static. Each gets a slow Ken Burns push or drift, and some get a parallax or light-leak pass, cut to the beat.
 - File names: save each file as its ID plus a short name (e.g. `S1_face_blue.png`) in the Drive folder, so the build picks it up by ID.
 
+## New style for all new stills (Tom, 2026-10-13): real phone photos, not AI-looking
+Every new image must look like a real, candid photo a friend took on their phone in a nice place. It must not look like an AI image, a stock shot or an editorial shoot. This replaces the "editorial music-video still" real-world anchor below, which Tom said made everything look AI-generated.
+- **Prompt anchor:** "candid smartphone photo taken by a friend, natural available light, real skin texture, slightly imperfect framing and focus, mild phone-camera HDR and noise, unposed, ordinary tasteful clothes".
+- **Places (nice, real, lived-in):** a warm apartment with plants, books and big windows; a garden or rooftop terrace at golden hour or at night with string lights; a small neighbourhood bar; a kitchen at 3 a.m.; a street outside at dawn.
+- **Avoid in prompts:** "editorial", "cinematic", "fashion photographer", "beautifully lit", "film grain", heavy bokeh, symmetrical posed groups, flawless skin, model looks, glossy loft parties.
+- **Keep:** Maya's look (from M0), the cast rule (every group shot includes at least one Black, one East Asian and one South Asian young adult), TokTic only, stylish and never sexualized.
+- In the Print treatment the stills are then printed in two inks; they should still read as real moments before printing.
+
 ## Style anchors
 - **Screen world:** cinematic, cold blue phone-screen light, shallow depth of field, 35mm.
 - **Real world (revised 2026-10-13):** editorial music-video still shot by a top fashion photographer, cinematic and beautifully lit, warm practical lights and soft haze, rich but natural colour, elegant styling, light and joyful, fine film grain, shallow depth of field, 50mm. Never a trashy party: no red cups, no mess, no harsh point-and-shoot flash.
