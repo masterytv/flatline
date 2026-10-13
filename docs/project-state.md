@@ -152,7 +152,7 @@ Implications:
 
 ## Decisions (Tom, 2026-10-13)
 1. Images: Tom generates them himself from Claude's prompts and uploads them to the Drive folder.
-2. Maya: 19, black shoulder-length hair, modern club clothing, a dark, edgy, confident look. Mixed East Asian and European: almond eyes, a European nose, so you can't tell where she's from (Tom, 2026-10-13, after the first M0). Keep the prompts stylish and tasteful, not sexualized; she's a young adult.
+2. Maya: 19, black shoulder-length hair, modern club clothing, a dark, edgy, confident look. European with almond-shaped eyes and a European nose (Tom, 2026-10-13, after two M0 takes; the mixed East Asian and European take still read as too Asian). Runway gen4_image kept producing an East Asian face for every European wording tried (four M0 takes in all; see the M0 prompt in docs/image-prompts.md for the latest). Options put to Tom: dark brown, slightly wavy hair instead of a jet-black blunt bob; a different image model on the Runway account; or a reference image from Tom. Keep the prompts stylish and tasteful, not sexualized; she's a young adult.
    - TokTic app colors: Claude proposed them in docs/image-prompts.md (acid lime accent).
 3. Repo: Tom wants a new PRIVATE repo called "flatline" (GitHub account masterytv, a personal account).
    - Done: Tom created it, and Claude attached it with add_repo (access push) on 2026-10-13.
