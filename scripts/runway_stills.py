@@ -4,6 +4,7 @@ Usage: python3 scripts/runway_stills.py M0            # the Maya reference
        python3 scripts/runway_stills.py S1 R3 ...     # specific stills
        python3 scripts/runway_stills.py all           # every still except M0
        python3 scripts/runway_stills.py --fetch S1 .. # re-download finished tasks, no new credits
+       python3 scripts/runway_stills.py --model gpt_image_2 M0   # another image model on the account
 
 Needs RUNWAY_API_KEY. Writes media/stills/<ID>.<ext> and copies to public/stills/.
 Shots with Maya use media/stills/M0.* as a reference image tagged @maya.
@@ -15,7 +16,9 @@ from concurrent.futures import ThreadPoolExecutor
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 API = 'https://api.dev.runwayml.com/v1'
 KEY = os.environ['RUNWAY_API_KEY']
-RATIO = '1920:1080'
+MODEL = 'gen4_image'
+# 16:9-ish size per model (each model accepts its own list of ratios)
+RATIOS = {'gen4_image': '1920:1080', 'gpt_image_2': '1920:1088', 'gemini_image3_pro': '2752:1536', 'nano_banana_2.1': '2752:1536'}
 CA = '/root/.ccr/ca-bundle.crt'
 CTX = ssl.create_default_context(cafile=CA) if os.path.exists(CA) else ssl.create_default_context()
 OUT = os.path.join(ROOT, 'media', 'stills')
@@ -74,7 +77,7 @@ def wait(sid, tid):
 
 
 def generate(sid, text, ref):
-    body = {'model': 'gen4_image', 'promptText': text, 'ratio': RATIO}
+    body = {'model': MODEL, 'promptText': text, 'ratio': RATIOS[MODEL]}
     if ref and sid != 'M0' and 'Maya' in text:
         body['promptText'] = text.replace('Maya', '@maya', 1)
         body['referenceImages'] = [{'uri': ref, 'tag': 'maya'}]
@@ -104,8 +107,11 @@ def download(sid, url):
 
 
 def main():
+    global MODEL
     ps = prompts()
     args = sys.argv[1:]
+    if args[:1] == ['--model']:
+        MODEL, args = args[1], args[2:]
     if args and args[0] == '--fetch':
         known = json.load(open(TASKS))
         for i in args[1:] or list(known):
