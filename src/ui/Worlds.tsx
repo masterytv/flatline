@@ -3,11 +3,15 @@ import {AbsoluteFill, getStaticFiles, Img, random, staticFile, useCurrentFrame} 
 import {pulse} from '../timing';
 
 /**
- * A still from public/stills/<ID>_*.{png,jpg,webp} when Tom's image exists,
+ * A still from public/stills/<ID>[_name].{png,jpg,webp} when the image exists,
  * otherwise a procedural stand-in so the edit can be timed before images arrive.
  */
-export const Still: React.FC<{id: string; fallback: React.ReactNode; style?: React.CSSProperties}> = ({id, fallback, style}) => {
-	const file = getStaticFiles().find((f) => f.name.startsWith(`stills/${id}_`) || f.name.startsWith(`stills/${id}.`));
+export const Still: React.FC<{id: string; fallback: React.ReactNode; style?: React.CSSProperties; small?: boolean}> = ({id, fallback, style, small}) => {
+	// `small` prefers the 1280px copy from `npm run stills:small` (thumbnails, heavy blur).
+	const files = getStaticFiles();
+	const file =
+		(small ? files.find((f) => f.name === `stills/small/${id}.jpg`) : undefined) ??
+		files.find((f) => f.name.startsWith(`stills/${id}_`) || f.name.startsWith(`stills/${id}.`));
 	if (file) {
 		return <Img src={staticFile(file.name)} style={{position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', ...style}} />;
 	}

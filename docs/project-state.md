@@ -121,7 +121,7 @@ Implications:
 | 0:44–1:01 | build | Scroll accelerates into a tunnel; battery steps down once per bar. 0:49 "Every beat a spark": each beat flashes a post. 0:55 "drum's on fire": a huge pulsing heart (like) icon and a red 1%. |
 | 1:01–1:05 | fade | The screen dims and glitches. |
 | 1:05 | "Clear!" | The screen cracks: 0%. Black. |
-| 1:05–1:24 | instrumental | 1:05–1:08 her reflection in the dead glass. 1:08–1:17 she looks up and the party fades in, out of focus. 1:17–1:21 (riser) focus sharpens and the frame edges crack. 1:21–1:24 (kick out) hold on her face, eyes up. |
+| 1:05–1:24 | instrumental | 1:05–1:08 her reflection in the dead glass. 1:08–1:17 out-of-focus photos of the room flip past every 2 beats (revised by Tom on 2026-10-13: one long blur-to-focus shot was too long). 1:17–1:21 (riser) flips every beat and the frame edges crack. 1:21–1:24 (kick out) her face comes into focus and holds. |
 | 1:24 | "Flatline" | FLATLINE slams on screen and the frame shatters. |
 | 1:25–1:36 | drop 1 | Full-screen flash photo dump, one photo every 2 beats. 1:32 "Flatline": white strobe plus type. |
 | 1:36–1:54 | "My heart stopped... and I started dancing" | Huge kinetic type. She dances for the first time. |
@@ -185,6 +185,7 @@ Implications:
 - Chromium: remotion.config.ts points at /opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell.
 - Song: download Flatline.mp3 from Drive into media/ and copy it to public/Flatline.mp3 (both git-ignored; a relative symlink breaks when Remotion copies public/). Without it, the render is silent.
 - Stills: put Tom's images in public/stills/ as <ID>_<name>.jpg/png/webp (e.g. S1_face_blue.png). `Still` in src/ui/Worlds.tsx uses the file when it exists and a procedural stand-in when it doesn't. public/stills is git-ignored via the image extensions.
+- After adding or replacing stills, run `npm run stills:small`. It makes 1280px copies in public/stills/small/, which the feed thumbnails and the blurred flips use so renders stay fast.
 - Timing: src/timing.ts reads the beat grid; src/opening/cues.ts holds every cue in the 0:00–1:24 shot list, each snapped to the beat nearest Tom's lyric time, plus the battery schedule (23% → red 20% at 0:04 → 10% at the break → one step per bar → 1% at 0:55 → 0% at "Clear!").
 - Code map: src/opening/ScreenScenes.tsx (phone-screen scenes), src/opening/ScreenOpening.tsx (room, frame cracks, FLATLINE slam, shatter), src/ui/ (phone, status bar, TokTic logo, notifications, stand-in worlds), src/theme.ts (TokTic palette).
 

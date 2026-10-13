@@ -5,8 +5,8 @@ import {BEATS, FPS, lastBeatIndex, pulse} from '../timing';
 import {Phone} from '../ui/Phone';
 import {KenBurns, PartyWorld, RealWorld, Still} from '../ui/Worlds';
 import {keys, ramp} from '../util';
-import {T} from './cues';
-import {PhoneScreen} from './ScreenScenes';
+import {T, flipAt} from './cues';
+import {FlipPhoto, PhoneScreen} from './ScreenScenes';
 
 export type OpeningProps = {debug: boolean};
 
@@ -177,7 +177,7 @@ export const ScreenOpening: React.FC<OpeningProps> = ({debug}) => {
 
 	// The room around the phone: dark, lit by the screen; the party leaks in once the screen dies.
 	const screenGlow = t < T.clear ? 1 - 0.8 * ramp(t, T.fade, T.clear) : 0;
-	const room = ramp(t, T.rebuild, T.riser, Easing.inOut(Easing.quad));
+	const room = ramp(t, T.rebuild, T.rebuild + 1.5, Easing.inOut(Easing.quad));
 	const roomFocus = ramp(t, T.riser, T.kickOut, Easing.inOut(Easing.quad));
 	const roomDim = ramp(t, T.kickOut, T.kickOut + 1);
 	const shakeAmp = 7 * ramp(t, T.riser, T.flatline, Easing.in(Easing.quad));
@@ -191,8 +191,9 @@ export const ScreenOpening: React.FC<OpeningProps> = ({debug}) => {
 		<AbsoluteFill style={{background: '#030406'}}>
 			{hasSong ? <Audio src={staticFile('Flatline.mp3')} /> : null}
 			{/* the party she isn't looking at, barely there until the screen dies */}
-			<AbsoluteFill style={{opacity: 0.12 + 0.6 * room * (1 - 0.6 * roomDim), filter: `blur(${36 - 26 * roomFocus}px)`, transform: 'scale(1.1)'}}>
-				<Still id="S2" fallback={<PartyWorld t={t} />} />
+			{/* the room stays out of focus while the photos flip; behind her face it's warm confetti light */}
+			<AbsoluteFill style={{opacity: 0.12 + 0.6 * room * (1 - 0.6 * roomDim), filter: `blur(${t < T.kickOut ? 36 - 14 * roomFocus : 14}px)`, transform: 'scale(1.1)'}}>
+				{flipAt(t) ? <FlipPhoto t={t} blur={0} /> : <Still id={t >= T.kickOut ? 'R5' : 'S2'} small fallback={<PartyWorld t={t} />} />}
 			</AbsoluteFill>
 			<AbsoluteFill style={{background: `radial-gradient(ellipse at 50% 50%, rgba(80,110,255,${0.22 * screenGlow}) 0%, rgba(3,4,6,0) 45%)`}} />
 			{!broken ? (

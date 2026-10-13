@@ -1,5 +1,5 @@
 import React from 'react';
-import {AbsoluteFill, Easing, random} from 'remotion';
+import {AbsoluteFill, Easing, getStaticFiles, random} from 'remotion';
 import {C, DISPLAY_FONT, PHONE_H, PHONE_W, UI_FONT} from '../theme';
 import {BEATS, beatsIn, pulse} from '../timing';
 import {Battery, Moon, StatusBar} from '../ui/StatusBar';
@@ -7,7 +7,7 @@ import {Notification, Notif} from '../ui/Notification';
 import {TokTicLogo} from '../ui/TokTicLogo';
 import {FaceWorld, KenBurns, LightsWorld, PartyWorld, ReflectionWorld, Still} from '../ui/Worlds';
 import {keys, ramp} from '../util';
-import {T, batteryAt, clockAt} from './cues';
+import {FEED_IDS, T, batteryAt, clockAt, flipAt} from './cues';
 
 // Everything here is drawn in phone-screen units (PHONE_W × PHONE_H).
 
@@ -405,7 +405,9 @@ const USERS = ['kai.mp4', 'jess.wav', 'luna.jpeg', 'dev.zip', 'nia.gif', 'theo.e
 const POST_H = 560;
 
 const PostArt: React.FC<{i: number; t: number}> = ({i, t}) => {
-	if (i % 7 === 2) return <Still id="S4" fallback={<LightsWorld t={t} />} />;
+	const id = FEED_IDS[i % FEED_IDS.length];
+	if (getStaticFiles().some((f) => f.name.startsWith(`stills/${id}`))) return <Still id={id} small fallback={null} />;
+	// procedural stand-in when the stills aren't downloaded
 	const h1 = Math.floor(random(`h1${i}`) * 360);
 	const h2 = (h1 + 60 + Math.floor(random(`h2${i}`) * 120)) % 360;
 	const shape = i % 3;
@@ -617,14 +619,27 @@ export const PhoneScreen: React.FC<{t: number}> = ({t}) => {
 	return <DeadScreen t={t} />;
 };
 
+/** One out-of-focus photo of the room, flipped on the beat (see flipAt), with a small punch on each cut. */
+export const FlipPhoto: React.FC<{t: number; blur: number}> = ({t, blur}) => {
+	const f = flipAt(t);
+	if (!f) return null;
+	const since = t - f.at;
+	const scale = 1.08 + 0.06 * Math.exp(-since / 0.15) + 0.02 * since;
+	return (
+		<AbsoluteFill style={{filter: `blur(${blur}px)`, transform: `scale(${scale}) translateX(${(f.n % 2 ? 1 : -1) * 1.5}%)`}}>
+			<Still id={f.id} small fallback={<PartyWorld t={t} />} />
+		</AbsoluteFill>
+	);
+};
+
 /** The screen after "Clear!": crack, 0%, black, her reflection, then the room leaking in. */
 const DeadScreen: React.FC<{t: number}> = ({t}) => {
 	const zeroBlink = t < T.clear + 0.25 || (t > T.clear + 0.4 && t < T.clear + 0.65);
 	const flash = 1 - ramp(t, T.clear, T.clear + 0.12);
 	const reflection = ramp(t, T.clear + 1.0, T.clear + 2.2);
-	const party = ramp(t, T.rebuild, T.rebuild + 3, Easing.inOut(Easing.quad));
-	const focus = ramp(t, T.riser, T.kickOut, Easing.inOut(Easing.quad));
-	const face = ramp(t, T.kickOut - 0.15, T.kickOut + 0.15);
+	const party = ramp(t, T.rebuild, T.rebuild + 0.6);
+	const face = t >= T.kickOut ? 1 : 0;
+	const faceFocus = ramp(t, T.kickOut, T.kickOut + 1.6, Easing.out(Easing.cubic));
 	const push = 1 + 0.1 * ramp(t, T.kickOut, T.drop, Easing.inOut(Easing.quad));
 	return (
 		<AbsoluteFill style={{background: '#000'}}>
@@ -633,10 +648,10 @@ const DeadScreen: React.FC<{t: number}> = ({t}) => {
 					<Still id="S6" fallback={<ReflectionWorld t={t} />} />
 				</KenBurns>
 			</AbsoluteFill>
-			<AbsoluteFill style={{opacity: party * (1 - face), filter: `blur(${16 * (1 - focus)}px)`, transform: `scale(${1.1 - 0.1 * focus})`}}>
-				<Still id="S2" fallback={<PartyWorld t={t} />} />
+			<AbsoluteFill style={{opacity: party * (1 - face)}}>
+				<FlipPhoto t={t} blur={keys(t, [T.rebuild, T.riser, T.kickOut], [18, 12, 7])} />
 			</AbsoluteFill>
-			<AbsoluteFill style={{opacity: face, transform: `scale(${push})`}}>
+			<AbsoluteFill style={{opacity: face, transform: `scale(${push})`, filter: `blur(${10 * (1 - faceFocus)}px)`}}>
 				<Still id="S1" fallback={<FaceWorld t={t} lookUp={1} />} />
 			</AbsoluteFill>
 			{t < T.clear + 0.9 && zeroBlink ? (

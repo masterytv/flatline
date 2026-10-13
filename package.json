@@ -5,6 +5,7 @@
   "description": "Motion-graphics music videos for \"Flatline\" (Remotion)",
   "scripts": {
     "studio": "remotion studio",
+    "stills:small": "python3 scripts/make_small_stills.py",
     "typecheck": "tsc --noEmit",
     "render:opening": "remotion render ScreenOpening out/opening.mp4",
     "render:opening-preview": "remotion render ScreenOpening out/opening-preview.mp4 --scale=0.5 --crf=28"
