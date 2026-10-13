@@ -1,5 +1,5 @@
 import React from 'react';
-import {AbsoluteFill, Audio, Easing, getStaticFiles, random, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Easing, random, useCurrentFrame, useVideoConfig} from 'remotion';
 import {C, DISPLAY_FONT, PHONE_H, PHONE_W} from '../theme';
 import {BEATS, FPS, lastBeatIndex, pulse} from '../timing';
 import {Phone} from '../ui/Phone';
@@ -116,7 +116,7 @@ const Shatter: React.FC<{t: number; scale: number}> = ({t, scale}) => {
 };
 
 /** "FLATLINE" slams in on the vocal; a flat ECG trace runs through it. */
-const FlatlineType: React.FC<{t: number; vertical: boolean}> = ({t, vertical}) => {
+export const FlatlineType: React.FC<{t: number; vertical: boolean}> = ({t, vertical}) => {
 	if (t < T.flatline) return null;
 	const slam = ramp(t, T.flatline, T.flatline + 0.13, Easing.out(Easing.exp));
 	const shake = (1 - ramp(t, T.flatline, T.flatline + 0.4)) * 14;
@@ -156,7 +156,7 @@ const FlatlineType: React.FC<{t: number; vertical: boolean}> = ({t, vertical}) =
 	);
 };
 
-const Debug: React.FC<{t: number}> = ({t}) => {
+export const Debug: React.FC<{t: number}> = ({t}) => {
 	const b = BEATS[Math.max(0, lastBeatIndex(t))];
 	const m = Math.floor(t / 60);
 	const s = (t - m * 60).toFixed(2).padStart(5, '0');
@@ -173,7 +173,6 @@ export const ScreenOpening: React.FC<OpeningProps> = ({debug}) => {
 	const t = frame / FPS;
 	const vertical = height > width;
 	const phoneScale = vertical ? (height * 0.9) / (PHONE_H + 2 * FRAME) : (height * 0.92) / (PHONE_H + 2 * FRAME);
-	const hasSong = getStaticFiles().some((f) => f.name === 'Flatline.mp3');
 
 	// The room around the phone: dark, lit by the screen; the party leaks in once the screen dies.
 	const screenGlow = t < T.clear ? 1 - 0.8 * ramp(t, T.fade, T.clear) : 0;
@@ -189,7 +188,6 @@ export const ScreenOpening: React.FC<OpeningProps> = ({debug}) => {
 
 	return (
 		<AbsoluteFill style={{background: '#030406'}}>
-			{hasSong ? <Audio src={staticFile('Flatline.mp3')} /> : null}
 			{/* the party she isn't looking at, barely there until the screen dies */}
 			{/* the room stays out of focus while the photos flip; behind her face it's warm confetti light */}
 			<AbsoluteFill style={{opacity: 0.12 + 0.6 * room * (1 - 0.6 * roomDim), filter: `blur(${t < T.kickOut ? 36 - 14 * roomFocus : 14}px)`, transform: 'scale(1.1)'}}>

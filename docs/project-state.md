@@ -178,7 +178,8 @@ Implications:
 4. Done (2026-10-13): all 17 stills generated on Runway with nano_banana_2.1 (Tom's pick, 6 credits each at 2752:1536), with M0 as the reference for the Maya shots. R6 was retaken once (the first take showed an Apple logo and face-up phones). Sent to Tom as full-resolution JPEGs for the Drive folder; the Drive tools can't upload images. Runway balance after: 348 credits.
    - A new session has no media: download the stills from Drive into media/stills/ and copy them to public/stills/ as <ID>.png or .jpg (git-ignored).
    - Restyle (Tom, 2026-10-13): R1 and R2 cut; S2, S5 and R3–R10 regenerated in the editorial style with the diverse cast (60 credits). The first-round images are in media/stills/v1/. Drop 1 now opens on R8. Small leftovers: beer bottles on the R10 rooftop; a light phone screen in S2. Balance after: 288 credits.
-5. Build drop 1 onwards: the photo dump, the kinetic type, the end card.
+5. Done (2026-10-13): first full build of drop 1 onwards, as the composition `Flatline0` (whole song plus end card) and `Flatline0Vertical`. Three more stills (R12–R14) were generated for the Maya moments (18 credits; 270 left; 18 of 20 images used). Waiting on Tom's notes.
+6. Next: Tom's notes on the full preview; check the lyric sync (the heart section and the repeats at 2:52 and 3:00 are placed on bar lines, not on measured vocal times); the 15 s and 30 s cutdowns; final 1080p renders (16:9 and 9:16).
 
 ## Remotion build
 - Commands: `npm install`, then `npm run studio` (live preview), `npm run typecheck`, `npm run render:opening-preview` (960×540) or `npm run render:opening` (1920×1080). The vertical version is the composition `ScreenOpeningVertical` (1080×1920). Add `--props='{"debug":true}'` for a timecode and bar counter in the corner.
@@ -187,6 +188,8 @@ Implications:
 - Stills: put Tom's images in public/stills/ as <ID>_<name>.jpg/png/webp (e.g. S1_face_blue.png). `Still` in src/ui/Worlds.tsx uses the file when it exists and a procedural stand-in when it doesn't. public/stills is git-ignored via the image extensions.
 - After adding or replacing stills, run `npm run stills:small`. It makes 1280px copies in public/stills/small/, which the feed thumbnails and the blurred flips use so renders stay fast.
 - Timing: src/timing.ts reads the beat grid; src/opening/cues.ts holds every cue in the 0:00–1:24 shot list, each snapped to the beat nearest Tom's lyric time, plus the battery schedule (23% → red 20% at 0:04 → 10% at the break → one step per bar → 1% at 0:55 → 0% at "Clear!").
+- Full video: src/full/cues.ts holds every cue from drop 1 to the end card (lyric cues snapped to the beat, sections on bar lines). src/full/Flatline0.tsx is the master timeline: the opening until the downbeat after the shatter, then the photo runs, kinetic type and moments. src/full/kit.tsx has the photo-cut engine (`cutsEvery` gives each cut its own Ken Burns move and a tighter crop on repeats), light leaks, strobes, flashes, confetti and the kinetic type. src/full/moments.tsx has the motion-graphics moments: phones down (glows on S5), "No pain..." UI bursts, 4:00 → ∞, the charger and notification flood, the phone flip, the screen-time card and the end card.
+- Renders: `npm run render:full-preview` (960×540), `npm run render:full` and `npm run render:vertical` (full size). `node scripts/frames.mjs <Composition> <outDir> <scale> <seconds...>` renders chosen frames as PNGs for quick checks.
 - Code map: src/opening/ScreenScenes.tsx (phone-screen scenes), src/opening/ScreenOpening.tsx (room, frame cracks, FLATLINE slam, shatter), src/ui/ (phone, status bar, TokTic logo, notifications, stand-in worlds), src/theme.ts (TokTic palette).
 
 ## Other context

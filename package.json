@@ -7,6 +7,9 @@
     "studio": "remotion studio",
     "stills:small": "python3 scripts/make_small_stills.py",
     "typecheck": "tsc --noEmit",
+    "render:full-preview": "remotion render Flatline0 out/flatline0-preview.mp4 --scale=0.5 --crf=26",
+    "render:full": "remotion render Flatline0 out/flatline0.mp4",
+    "render:vertical": "remotion render Flatline0Vertical out/flatline0-vertical.mp4",
     "render:opening": "remotion render ScreenOpening out/opening.mp4",
     "render:opening-preview": "remotion render ScreenOpening out/opening-preview.mp4 --scale=0.5 --crf=28"
   },

@@ -18,6 +18,13 @@ export const downbeat = (bar: number): number => {
 	return b.t;
 };
 
+/** Time of a given bar and beat (beat 1 = downbeat). */
+export const bt = (bar: number, beat = 1): number => {
+	const b = BEATS.find((x) => x.bar === bar && x.beat === beat);
+	if (!b) throw new Error(`No beat ${bar}.${beat}`);
+	return b.t;
+};
+
 export const beatsIn = (t0: number, t1: number, list: Beat[] = BEATS) => list.filter((b) => b.t >= t0 && b.t < t1);
 
 /** Index of the last beat at or before t, or -1. */
