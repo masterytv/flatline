@@ -19,6 +19,14 @@ Every new image must look like a real, candid photo a friend took on their phone
 - **Keep:** Maya's look (from M0), the cast rule (every group shot includes at least one Black, one East Asian and one South Asian young adult), TokTic only, stylish and never sexualized.
 - In the Print treatment the stills are then printed in two inks; they should still read as real moments before printing.
 
+## Starting over (Tom, 2026-10-13): a new image set that looks like real phone photos
+Tom: start over on images, and make them look real, not AI-generated: real photos from a phone, in a nice place. Everything below this section (S1–S6, R3–R14 and the "editorial music-video still" anchor) is the old set, kept only for reference. The new set is planned from scratch around the Print treatment, with as many images as it needs (no cap), and may replace the opening's stills too.
+- **Prompt anchor:** "candid smartphone photo taken by a friend, natural available light, real skin texture, slightly imperfect framing and focus, mild phone-camera HDR and noise, unposed, ordinary tasteful clothes".
+- **Places (nice, real, lived-in):** a warm apartment with plants, books and big windows; a garden or rooftop terrace at golden hour or at night with string lights; a small neighbourhood bar; a kitchen at 3 a.m.; a street outside at dawn.
+- **Avoid in prompts:** "editorial", "cinematic", "fashion photographer", "beautifully lit", "film grain", heavy bokeh, symmetrical posed groups, flawless skin, model looks, glossy loft parties.
+- **Keep:** Maya's look (M0 as the identity reference), the cast rule (every group shot includes at least one Black, one East Asian and one South Asian young adult), TokTic only, stylish and never sexualized, each image used once.
+- **Process:** propose the shot list with the count and Runway cost first (nano_banana_2.1, 6 credits each, about 270 credits left); generate a small test batch and show Tom before the rest. In Print the photos are then printed in two inks; they must still read as real moments before printing.
+
 ## Style anchors
 - **Screen world:** cinematic, cold blue phone-screen light, shallow depth of field, 35mm.
 - **Real world (revised 2026-10-13):** editorial music-video still shot by a top fashion photographer, cinematic and beautifully lit, warm practical lights and soft haze, rich but natural colour, elegant styling, light and joyful, fine film grain, shallow depth of field, 50mm. Never a trashy party: no red cups, no mess, no harsh point-and-shoot flash.
