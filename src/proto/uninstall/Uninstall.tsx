@@ -10,6 +10,7 @@ import {DropScene} from './s_drop';
 import {HeartScene, SweepScene, WriteScene} from './s_heart';
 import {FloorScene, SettingsScene} from './s_floor';
 import {AvatarScene, BatteryScene, RestoreScene, SpinnerScene, TableScene} from './s_mid';
+import {DawnScene, DetonateScene, EndCardScene, FinalScene, IrisScene} from './s_end';
 import {bt} from '../../timing';
 
 // UNINSTALL: after the shatter, TokTic's own interface comes apart and becomes the dance.
@@ -28,6 +29,11 @@ export const Uninstall: React.FC<{debug: boolean}> = ({debug}) => {
 	else if (t < F.drop3 + 0.32) scene = <RestoreScene t={t} />;
 	else if (t < bt(87)) scene = <TableScene t={t} />;
 	else if (t < F.type2) scene = <BatteryScene t={t} />;
+	else if (t < F.final) scene = <IrisScene t={t} />;
+	else if (t < F.dancing2) scene = <FinalScene t={t} />;
+	else if (t < F.dawn) scene = <DetonateScene t={t} />;
+	else if (t < F.songEnd) scene = <DawnScene t={t} />;
+	else scene = <EndCardScene t={t} />;
 	return (
 		<AbsoluteFill style={{background: '#000'}}>
 			{scene}

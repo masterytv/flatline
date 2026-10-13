@@ -154,12 +154,12 @@ export const FloorLayer: React.FC<{t: number; dim?: number}> = ({t, dim = 1}) =>
 			const pts = [project(X0, Z0), project(X1, Z0), project(X1, Z1), project(X0, Z1)];
 			const far = clamp01((Z0 - 2) / 26);
 			const lit =
-				pattern === 0 ? (c + absRow + bi) % 2 === 0 : pattern === 1 ? (c - absRow + bi + 40) % 4 === 0 : Math.abs(Math.hypot(c - 3, (absRow % 8) - 4) - ((bi % 4) + 0.5)) < 0.8;
-			const amber = lit ? env * (1 - far * 0.6) : 0;
-			const fill = amber > 0.02 ? mix('#151922', U.amber, amber * 0.9) : '#121620';
+				pattern === 0 ? (c + absRow + bi) % 3 === 0 : pattern === 1 ? (c - absRow + bi + 60) % 4 === 0 : (c * 7 + absRow * 3 + bi) % 5 === 0;
+			const amber = lit ? env * (1 - far * 0.5) : 0;
+			const fill = amber > 0.02 ? mix('#10131A', U.amber, amber * 0.85) : '#0E1117';
 			tiles.push(
 				<g key={`${r}-${c}`}>
-					<polygon points={pts.map((p) => p.join(',')).join(' ')} fill={fill} stroke={U.lime} strokeWidth={1.2} strokeOpacity={0.55 * (1 - far)} />
+					<polygon points={pts.map((p) => p.join(',')).join(' ')} fill={fill} stroke={amber > 0.02 ? U.amber : U.lime} strokeWidth={1.2} strokeOpacity={(amber > 0.02 ? 0.9 : 0.32) * (1 - far)} />
 					{Z0 < 9 ? (() => {
 						// the post's heart-and-count row
 						const [hx, hy] = project(X0 + 0.12, Z0 + 0.1);
@@ -195,7 +195,7 @@ export const FloorLayer: React.FC<{t: number; dim?: number}> = ({t, dim = 1}) =>
 			{POOLS.map((p, i) => {
 				const [X, Z] = poolPos(i, t);
 				const [x, y] = project(X, Z);
-				const R = 1.1;
+				const R = 1.5;
 				const rx = (R * FOCAL) / Z;
 				const ry = (R * CAM * FOCAL) / (Z * Z);
 				const joined = seg(t, bt(65, 4), bt(66, 2));
@@ -208,8 +208,15 @@ export const FloorLayer: React.FC<{t: number; dim?: number}> = ({t, dim = 1}) =>
 					</g>
 				);
 			})}
+			<defs>
+				<linearGradient id="haze" x1="0" y1="0" x2="0" y2="1">
+					<stop offset="0" stopColor="#000" stopOpacity={1} />
+					<stop offset="0.8" stopColor={U.amber} stopOpacity={0.06 + 0.08 * env} />
+					<stop offset="1" stopColor={U.amber} stopOpacity={0.12 + 0.1 * env} />
+				</linearGradient>
+			</defs>
+			<rect width={W} height={HORIZON} fill="url(#haze)" />
 			<Neon d={`M0,${HORIZON} L${W},${HORIZON}`} color={U.lime} width={2.5} />
-			<rect width={W} height={HORIZON} fill="#000" opacity={0.6} />
 		</g>
 	);
 };
@@ -347,17 +354,6 @@ export const SettingsScene: React.FC<{t: number}> = ({t}) => {
 			</g>
 			<rect x={SHEET_X} y={sheetY} width={SHEET_W} height={H + 100} rx={48} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={2} />
 			<g clipPath="url(#sheet-clip)">
-				{/* status bar: the digits drop out of the top of the frame on "no clock" */}
-				<g fontFamily={UI_FONT} fontWeight={600} fontSize={30} fill={U.text}>
-					{'2:08'.split('').map((ch, i) => {
-						const dd = clockDrop < 0 ? 0 : Math.max(0, clockDrop - i * 0.04);
-						return (
-							<text key={i} x={SHEET_X + 60 + i * 19 + (i > 1 ? -6 : 0)} y={sheetY + 58 - 2600 * dd * dd} transform={dd > 0 ? `rotate(${-dd * 200 * (i % 2 ? 1 : -1)} ${SHEET_X + 66 + i * 19} ${sheetY + 50 - 2600 * dd * dd})` : undefined}>
-								{ch}
-							</text>
-						);
-					})}
-				</g>
 				<g transform={`translate(${SHEET_X + SHEET_W - 112} ${sheetY + 48})`}>
 					<rect x={0} y={-14} width={52} height={26} rx={7} fill="none" stroke="rgba(242,244,248,0.6)" strokeWidth={2.5} />
 					<rect x={4} y={-10} width={30} height={18} rx={3} fill={U.green} />
@@ -386,6 +382,20 @@ export const SettingsScene: React.FC<{t: number}> = ({t}) => {
 						{handleShown}
 					</text>
 				</g>
+			</g>
+			{/* status bar: the digits fly up out of the top of the frame on "no clock" */}
+			<g fontFamily={UI_FONT} fontWeight={600} fontSize={30} fill={U.text}>
+				{'2:08'.split('').map((ch, i) => {
+					const dd = clockDrop < 0 ? 0 : Math.max(0, clockDrop - 0.12 - i * 0.05);
+					const lift = 140 * dd + 650 * dd * dd;
+					const x = SHEET_X + 60 + i * 19 + (i > 1 ? -6 : 0) + dd * (i - 1.5) * 90;
+					const y = sheetY + 58 - lift;
+					return (
+						<text key={i} x={x} y={y} transform={dd > 0 ? `rotate(${dd * 260 * (i % 2 ? 1 : -1)} ${x + 8} ${y - 10})` : undefined} fill={dd > 0 ? U.lime : U.text}>
+							{ch}
+						</text>
+					);
+				})}
 			</g>
 			{flood > 0 ? <circle cx={knobX} cy={knobY} r={40 + 2400 * inCubic(flood)} fill="#fff" /> : null}
 		</Stage>

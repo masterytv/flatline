@@ -65,12 +65,12 @@ const MiniIcon: React.FC<{x: number; y: number; s: number; t: number}> = ({x, y,
 
 /** The TokTic wordmark: the dot of the i is a ticking clock. `stopped` freezes the hand. */
 export const LogoMark: React.FC<{size: number; t: number; color?: string; anchor?: 'middle' | 'start'; handAngle?: number}> = ({size, t, color = U.lime, anchor = 'middle', handAngle}) => {
-	// measured advance of "TokTıc" in Inter 800 ≈ 2.86 em with −0.04 em tracking
-	const wEm = 2.86;
+	// measured in Chrome: "TokTıc" in Inter 800 with −0.04 em tracking is 3.07 em wide; the ı is centred at 2.41 em, its top 0.545 em above the baseline
+	const wEm = 3.07;
 	const x0 = anchor === 'middle' ? (-wEm * size) / 2 : 0;
-	const dotX = x0 + 2.26 * size;
-	const dotY = -0.86 * size;
-	const r = size * 0.15;
+	const dotX = x0 + 2.41 * size;
+	const dotY = 0.36 * size - 0.545 * size - 0.27 * size;
+	const r = size * 0.16;
 	const a = handAngle ?? Math.floor(t * 2) * 30;
 	return (
 		<g>

@@ -136,17 +136,17 @@ const poseFor = (i: number, j: number): Pose => {
 	const sl = SLOTS[i];
 	const jitter = (rnd(`rot${i}-${j}`) - 0.5) * 16;
 	if (j < 4) {
-		const k = 0.45 + 0.55 * ((j + 1) / 4);
+		const k = 0.62 + 0.38 * ((j + 1) / 4);
 		return {x: W / 2 + (sl.x - W / 2) * k, y: H / 2 + (sl.y - H / 2) * k, z: sl.z * k, s: sl.s * (0.7 + 0.3 * k), rot: jitter * (1 - k * 0.5), rotY: 0};
 	}
 	if (j < 8) {
 		const step = j - 4;
 		const c = COLUMN_ORDER.indexOf(i);
-		const spacing = 150;
+		const spacing = 200;
 		let pos = c - 3 - step; // scrolls up one slot per beat
 		pos = ((((pos + 8) % N) + N) % N) - 8;
-		const fit = Math.min(1.7, 320 / maxDim(sl.p));
-		return {x: W / 2 + (c % 2 ? 60 : -60), y: H / 2 + pos * spacing, z: (c % 3) * 60 - 60, s: fit, rot: 0, rotY: 0};
+		const fit = Math.min(2.4, 470 / maxDim(sl.p));
+		return {x: W / 2 + (c % 2 ? 90 : -90), y: H / 2 + pos * spacing, z: (c % 3) * 80 - 80, s: fit, rot: (c % 2 ? 1 : -1) * 2, rotY: 0};
 	}
 	const step = j - 8;
 	const c = COLUMN_ORDER.indexOf(i);

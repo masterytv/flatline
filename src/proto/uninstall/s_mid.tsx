@@ -91,12 +91,23 @@ export const SpinnerScene: React.FC<{t: number}> = ({t}) => {
 					<circle cx={dot[0]} cy={dot[1]} r={9} fill="#fff" />
 				</g>
 			) : null}
-			{white > 0 ? (
-				<g opacity={white}>
-					<rect width={W} height={H} fill="#fff" opacity={1 - seg(contract, 0, 0.6)} />
-					<ellipse cx={cx} cy={cy} rx={lerp(2200, rx, contract)} ry={lerp(2200, rx * 0.4, contract)} fill="none" stroke="#fff" strokeWidth={lerp(2000, 120, contract)} />
-				</g>
-			) : null}
+			{white > 0.001 ? (() => {
+				const {rx: erx, ry: ery} = ringGeom();
+				const asp = ery / erx;
+				const ro = lerp(erx + band / 2, 2600, white ** 1.6);
+				const ri = lerp(Math.max(0, erx - band / 2), 0, white ** 0.6);
+				const ell = (r: number) => `M${cx - r},${cy} a${r},${r * asp} 0 1,0 ${2 * r},0 a${r},${r * asp} 0 1,0 ${-2 * r},0`;
+				return (
+					<g>
+						<defs>
+							<filter id="flood-soft" x="-60%" y="-60%" width="220%" height="220%">
+								<feGaussianBlur stdDeviation={lerp(12, 60, white)} />
+							</filter>
+						</defs>
+						<path d={`${ell(ro)} ${ell(ri)}`} fillRule="evenodd" fill="#fff" opacity={Math.min(1, white * 3)} filter="url(#flood-soft)" transform={`rotate(${TRAIL.rot} ${cx} ${cy})`} />
+					</g>
+				);
+			})() : null}
 		</Stage>
 	);
 };
@@ -124,6 +135,14 @@ export const AvatarScene: React.FC<{t: number}> = ({t}) => {
 	const mx = faces.reduce((s, f) => s + f[0], 0) / 4;
 	const my = faces.reduce((s, f) => s + f[1], 0) / 4 + 30;
 	const radius = (150 + 30 * closer) * born * (1 + 0.06 * k);
+	const blobs = (fill: string) => (
+		<>
+			{faces.map(([x, y], i) => (
+				<circle key={i} cx={lerp(x, mx + (x - mx) * 0.86, closer)} cy={lerp(y + 20, my, closer * 0.8)} r={radius} fill={fill} />
+			))}
+			{closer > 0.5 ? <rect x={faces[0][0] - 40} y={my - radius * 1.05} width={faces[3][0] - faces[0][0] + 80} height={radius * 2.1} rx={radius} fill={fill} opacity={seg(closer, 0.5, 1)} /> : null}
+		</>
+	);
 	return (
 		<Stage>
 			<defs>
@@ -135,14 +154,13 @@ export const AvatarScene: React.FC<{t: number}> = ({t}) => {
 			<rect width={W} height={H} fill={U.warmBlack} />
 			<g transform={`translate(${mx} ${my}) scale(${lerp(1, 0.42, shrink)} ${lerp(1, 0.2, shrink)}) translate(${-mx} ${-my})`}>
 				<WorldWindow plane={R4}>
-					<g filter="url(#goo)">
-						{faces.map(([x, y], i) => (
-							<circle key={i} cx={lerp(x, mx + (x - mx) * 0.86, closer)} cy={lerp(y + 20, my, closer * 0.8)} r={radius} fill="#fff" />
-						))}
-						{closer > 0.5 ? <rect x={faces[0][0] - 40} y={my - radius * 1.05} width={faces[3][0] - faces[0][0] + 80} height={radius * 2.1} rx={radius} fill="#fff" opacity={seg(closer, 0.5, 1)} /> : null}
-					</g>
+					<g filter="url(#goo)">{blobs('#fff')}</g>
 				</WorldWindow>
-				<rect width={W} height={H} fill={U.surface} opacity={0.94 * shrink} style={{mixBlendMode: 'normal'}} />
+				{shrink > 0 ? (
+					<g filter="url(#goo)" opacity={0.94 * shrink}>
+						{blobs(U.surface)}
+					</g>
+				) : null}
 			</g>
 			<DisplayText x={W / 2} y={150} size={40} weight={500} fill={U.cream} opacity={seg(t, F.together, F.together + 0.3) * (1 - shrink)} spacing={0.02}>
 				the gang
@@ -191,8 +209,8 @@ const restorePct = (t: number) => {
 export const RestoreScene: React.FC<{t: number}> = ({t}) => {
 	const failAt = bt(82, 3); // "everything"
 	const failing = t >= failAt;
-	const fd = (i: number) => Math.max(0, t - failAt - i * 0.03);
-	const fallY = (i: number) => 0.5 * 5200 * fd(i) ** 2;
+	const fd = (i: number) => Math.max(0, t - failAt - i * 0.014);
+	const fallY = (i: number) => 420 * fd(i) + 0.5 * 6500 * fd(i) ** 2;
 	const fallR = (i: number) => fd(i) * (rnd(`fr${i}`) - 0.5) * 520;
 	const glassBg = failing ? 1 - seg(t, failAt, failAt + 0.14) : 1;
 	const grow = smooth(seg(t, F.kickOut3, F.drop3));
@@ -338,7 +356,7 @@ export const RestoreScene: React.FC<{t: number}> = ({t}) => {
 						<rect x={GX} y={GY} width={GW} height={GH} rx={56} fill="#fff" />
 					</WorldWindow>
 				) : null}
-				<rect x={GX} y={GY} width={GW} height={GH} rx={56} fill={flip >= 0.5 ? '#0c0d10' : U.bg} opacity={flip >= 0.5 ? 1 : glassBg * outline} />
+				<rect x={GX} y={GY} width={GW} height={GH} rx={56} fill={flip >= 0.5 ? '#202228' : U.bg} stroke={flip >= 0.5 ? '#3a3d45' : 'none'} strokeWidth={3} opacity={flip >= 0.5 ? 1 : glassBg * outline} />
 				{flip >= 0.5 ? <rect x={GX + 26} y={GY + 26} width={120} height={120} rx={34} fill="#141519" stroke="#24262c" strokeWidth={2} /> : null}
 				{/* lime wireframe phone */}
 				<rect x={GX - 14} y={GY - 14} width={GW + 28} height={GH + 28} rx={70} fill="none" stroke={U.lime} strokeWidth={2} strokeDasharray="10 8" opacity={outline * (1 - bezelFade) * (flip >= 0.5 ? 0 : 1)} vectorEffect="non-scaling-stroke" />
@@ -351,7 +369,7 @@ export const RestoreScene: React.FC<{t: number}> = ({t}) => {
 				) : null}
 			</g>
 			{t >= F.alive + 0.4 && t < F.drop3 ? (
-				<DisplayText x={1500} y={560 - 30 * outCubic(seg(t, F.alive + 0.4, F.alive + 1.2))} size={52} weight={500} anchor="start" fill={U.cream} opacity={seg(t, F.alive + 0.4, F.alive + 1.0) * (1 - seg(t, F.drop3 - 0.4, F.drop3))} spacing={0}>
+				<DisplayText x={1360} y={560 - 30 * outCubic(seg(t, F.alive + 0.4, F.alive + 1.2))} size={52} weight={500} anchor="start" fill={U.cream} opacity={seg(t, F.alive + 0.4, F.alive + 1.0) * (1 - seg(t, F.drop3 - 0.4, F.drop3))} spacing={0}>
 					to feel everything
 				</DisplayText>
 			) : null}
