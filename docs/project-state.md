@@ -172,7 +172,9 @@ Implications:
 1. Done (2026-10-13): image prompts, 17 stills plus a Maya reference. In the repo as docs/image-prompts.md and in Drive as the Google Doc "Flatline – 0% Image Prompts" (1n0Qnq3TwnBmtrLEqdNqWC6S2q1CrfvtV3R4TIwwuiCQ).
 2. Done (2026-10-13): Remotion scaffold (see "Remotion build" below).
 3. Done (2026-10-13): first test render of the screen-world opening, 0:00 to 1:26.6 (it runs to the downbeat after the breakout so the shatter plays out). Images are procedural stand-ins. Waiting on Tom's notes.
-4. Tom: approve the image count and Runway cost (about 144 credits at 1080p, before retakes), or generate the stills himself. Then download them into public/stills/ named by ID; they replace the stand-ins automatically.
+4. Done (2026-10-13): all 17 stills generated on Runway with nano_banana_2.1 (Tom's pick, 6 credits each at 2752:1536), with M0 as the reference for the Maya shots. R6 was retaken once (the first take showed an Apple logo and face-up phones). Sent to Tom as full-resolution JPEGs for the Drive folder; the Drive tools can't upload images. Runway balance after: 348 credits.
+   - A new session has no media: download the stills from Drive into media/stills/ and copy them to public/stills/ as <ID>.png or .jpg (git-ignored).
+   - Known small issues, left as is: R4 has a "NEW YORK" T-shirt; R7 is a selfie Maya takes herself (the brief said someone else takes it); three phones in R6 lie face-up with their screens off.
 5. Build drop 1 onwards: the photo dump, the kinetic type, the end card.
 
 ## Remotion build

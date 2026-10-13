@@ -10,13 +10,13 @@ Needs RUNWAY_API_KEY. Writes media/stills/<ID>.<ext> and copies to public/stills
 Shots with Maya use media/stills/M0.* as a reference image tagged @maya.
 Never prints the key.
 """
-import base64, json, mimetypes, os, re, shutil, ssl, sys, time, urllib.parse, urllib.request
+import base64, json, mimetypes, os, re, shutil, ssl, subprocess, sys, time, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 API = 'https://api.dev.runwayml.com/v1'
 KEY = os.environ['RUNWAY_API_KEY']
-MODEL = 'gen4_image'
+MODEL = 'nano_banana_2.1'  # Tom's pick, 2026-10-13 (6 credits per still)
 # 16:9-ish size per model (each model accepts its own list of ratios)
 RATIOS = {'gen4_image': '1920:1080', 'gpt_image_2': '1920:1088', 'gemini_image3_pro': '2752:1536', 'nano_banana_2.1': '2752:1536'}
 CA = '/root/.ccr/ca-bundle.crt'
@@ -62,11 +62,12 @@ def prompts():
 
 
 def reference():
+    # Runway caps inline images, so send a 1376px JPEG copy of M0 (made with ffmpeg).
     for f in sorted(os.listdir(OUT)) if os.path.isdir(OUT) else []:
         if f.startswith('M0.'):
-            p = os.path.join(OUT, f)
-            mime = mimetypes.guess_type(p)[0] or 'image/png'
-            return f'data:{mime};base64,' + base64.b64encode(open(p, 'rb').read()).decode()
+            small = os.path.join(OUT, 'M0_ref.jpg')
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', os.path.join(OUT, f), '-vf', 'scale=1376:-2', '-q:v', '3', small], check=True)
+            return 'data:image/jpeg;base64,' + base64.b64encode(open(small, 'rb').read()).decode()
     return None
 
 
@@ -91,6 +92,8 @@ def wait(sid, tid):
 
 
 def generate(sid, text, ref):
+    if 'no text' not in text.lower():
+        text += ' No text, no captions, no watermark.'
     body = {'model': MODEL, 'promptText': text, 'ratio': RATIOS[MODEL]}
     if ref and sid != 'M0' and 'Maya' in text:
         body['promptText'] = text.replace('Maya', '@maya', 1)
