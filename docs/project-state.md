@@ -7,6 +7,15 @@
 - The "editorial fashion photographer, Edison-bulb loft" style in docs/image-prompts.md is what Tom called AI-looking; don't reuse it as is.
 - A new container has no media: download Flatline.mp3 and the stills from the Drive folder (Tom uploads the JPEGs he was sent).
 
+## Second-half treatments (2026-10-13)
+After Tom's verdict, three treatments for 1:24.8 to the end card were pitched, prototyped and judged side by side by three critics (taste, music-video craft, buildability):
+- **Print, "Proof of Life"** (src/proto/print, scored 7/7/7, recommended). Maya's world turns to paper after the shatter: every still is printed live in two inks (orange = real life, ultramarine = screen world, TokTic lime only on the app's own things) on cream newsprint, each still used once, never shown as a glossy photo. Highlights: DANCING letter windows onto R3; S5 printed cold and warmed by one stencil per phone going down; the S1/R12 zine diptych at 2:52; the press stopping half-printed on "Still" and the dots blowing off on 3:16.46. Risks: the jump from the dark opening to cream paper, a long orange/black stretch, 16 stills (cut S2, S3, R11 to get to about 12), halftone shimmer after compression.
+- **Monitor** (src/proto/monitor, 5/5/6). The heart-monitor line is the protagonist; the real world only through shapes it cuts. Best quiet moments (STOPPED with HR 0, six-lane ward monitor, the R12 eyelid), but energy runs backwards on the drops and people are barely on screen.
+- **Uninstall** (src/proto/uninstall, 3/4/3). Rejected: stills shown clean and glossy again. Its drop-1 hand-over (TokTic parts dancing out of the shattered phone on the beat, bars 46–48) is the best of the three and is the recommended graft into Print.
+- Recommended grafts into Print: Uninstall's drop-1 hand-over (paper arrives on the 1:32 "Flatline"); Monitor's real "stopped" (flat rule, HR 0, then HR counting up to the live tempo); a battery charging one ink cell per beat in drop 3 in place of the unreadable R6 phone-door table.
+- Rebuilding the prototypes in a fresh workspace: Print needs `python3 src/proto/print/tools/print_plates.py` (numpy, Pillow) to regenerate its git-ignored density plates, and its fonts (Anton, Instrument Serif, IBM Plex Mono) should come from @fontsource packages. Monitor's effects tools (OpenCV, Hershey font) were installed only in a scratch folder. Each prototype has its own entry: `FRAMES_ENTRY=src/proto/<name>/index.ts node scripts/frames.mjs Proto<Name> <outDir> 0.5 <seconds...>`.
+- Waiting on Tom: which treatment (and which grafts); whether the second half may reuse stills the opening showed; how the 20-still cap counts (19 generated so far, including M0); ear-checking lyric cues placed on bar lines; when to build the 9:16.
+
 ## Where things are
 - Google Drive folder (Claude's working folder): 1S4kGIm8W8tyQuCnGBZNV8zWEq3DYxMqJ
   - Flatline.mp3: 1YQoac_93cuQ0tZYHAwsNbaOykf0kOfmE (the link Tom first sent, 1NU72tFT..., is "It Was You.mp3")
