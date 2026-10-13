@@ -116,7 +116,7 @@ Implications:
   - Screen world: "cinematic, cold blue phone-screen light, shallow depth of field, 35mm"
   - Real world (revised 2026-10-13): editorial music-video still by a top fashion photographer, warm Edison-bulb light and haze in an elegant industrial loft, light and joyful, fine film grain. The full wording is in docs/image-prompts.md.
   - Keep Maya's face mostly from behind, in profile or blurred, so she stays consistent.
-- Images: up to 20, about 16 planned:
+- Images (original plan, superseded: there is no longer a cap):
   - Screen world: face lit blue by the phone; party seen through the camera; 4 feed thumbnails; five friends on a couch lit by phones; her reflection in a cracked black screen.
   - Real world: friends laughing mid-dance; living-room dance floor with string lights; her from behind with hair flying; friends shouting the lyrics; confetti; table of face-down phones; group selfie taken by someone else; hands up in bokeh; spin with a light trail; rooftop at dawn; phone face-down on a ledge at sunrise.
 

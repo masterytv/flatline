@@ -1,6 +1,6 @@
 # 0% image prompts (Flatline)
 
-18 stills, under the 20 cap, which leaves 2 spare (R12–R14 added on 2026-10-13 for the three Maya moments in the second half). Six are for the screen world (before the 1:24 breakout) and nine for the real world (after it). R1 and R2 were cut on 2026-10-13 (too much like a messy house party); drop 1 now opens on R8. The other feed posts in the phone UI are motion graphics, so they need no images.
+18 stills (R12–R14 added on 2026-10-13 for the three Maya moments in the second half). There is no longer an image cap (Tom, 2026-10-13); for the Print treatment, new stills are printed in two inks, so they don't need the glossy editorial style below. Six are for the screen world (before the 1:24 breakout) and nine for the real world (after it). R1 and R2 were cut on 2026-10-13 (too much like a messy house party); drop 1 now opens on R8. The other feed posts in the phone UI are motion graphics, so they need no images.
 
 ## How to use these
 - **Maya (paste into every prompt that shows her):** "Maya, a 19-year-old young woman of European appearance, slim, with high cheekbones, large almond-shaped light grey-green eyes, straight dark brows, a straight slim nose, long layered tousled hair, dark chestnut brown melting into caramel ends, modern dark club clothing (black cropped jacket, silver jewellery), a calm, intense, confident look." Keep her from behind, in profile, or soft and out of focus where the shot allows, so she stays consistent across shots. Stylish, never sexualized.
