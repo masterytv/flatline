@@ -3,7 +3,7 @@
 17 stills, under the 20 cap, which leaves 3 spare for retakes. Six are for the screen world (before the 1:24 breakout) and eleven for the real world (after it). The other feed posts in the phone UI are motion graphics, so they need no images.
 
 ## How to use these
-- **Maya (paste into every prompt that shows her):** "Maya, a 19-year-old young woman with black shoulder-length hair, modern dark club clothing (black cropped jacket, silver jewellery), a dark, edgy, confident look." Keep her from behind, in profile, or soft and out of focus, so she stays consistent across shots. Stylish, never sexualized.
+- **Maya (paste into every prompt that shows her):** "Maya, a 19-year-old young woman of mixed East Asian and European heritage whose ethnicity is hard to place (almond-shaped eyes, a straight, slim European nose), black shoulder-length hair, modern dark club clothing (black cropped jacket, silver jewellery), a dark, edgy, confident look." Keep her from behind, in profile, or soft and out of focus, so she stays consistent across shots. Stylish, never sexualized.
 - **Consistency:** generate `M0` first and use it as the reference image for every other shot with Maya in it. In Runway's text-to-image model (gen4_image) that means passing it as a reference image tagged `maya` and writing `@maya` in the prompt in place of the description.
 - **Size:** 16:9 (1920×1080). Keep the subject in the middle third so a 9:16 crop also works for the vertical edit.
 - **No text, logos or real apps in any image.** Every phone screen in the stills shows only abstract glow; the TokTic UI is added in motion graphics.
@@ -17,7 +17,7 @@
 ---
 
 ## M0: Maya reference (not used in the edit)
-> Character reference portrait, three-quarter view from behind and slightly to the side, of Maya, a 19-year-old young woman with black shoulder-length hair, black cropped jacket, silver jewellery, dark edgy confident look, standing against a plain dark grey wall, soft even studio light, sharp focus on hair and outfit, face mostly turned away, 35mm, neutral colours.
+> Character reference portrait, three-quarter view from behind and slightly to the side, of Maya, a 19-year-old young woman of mixed East Asian and European heritage whose ethnicity is hard to place, almond-shaped eyes, a straight, slim European nose, black shoulder-length hair, black cropped jacket, silver jewellery, dark edgy confident look, standing against a plain dark grey wall, soft even studio light, sharp focus on hair and outfit, face turned three-quarters toward the camera over her shoulder, 35mm, neutral colours.
 
 ## Screen world (0:00–1:24)
 
