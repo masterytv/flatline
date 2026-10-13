@@ -165,6 +165,8 @@ Implications:
 - Check in a new session (prints names only, never the value): `env | cut -d= -f1 | grep -i runway`, then `curl -sS -o /dev/null -w "%{http_code}" https://api.dev.runwayml.com/v1/organization -H "Authorization: Bearer $VAR" -H "X-Runway-Version: 2024-11-06"`. A 200 means it works; that endpoint also reports the credit balance and costs nothing.
 - Intended use: generating the stills (Runway's text-to-image model, which can take reference images to keep Maya consistent). Tom ruled out AI video on cost, so don't generate video unless he asks. Confirm the image count and cost with Tom before the first paid batch.
 - Generated images may download from a different host than the API. If that host is blocked, name it to Tom so he can allow it too.
+- 2026-10-13: Tom approved generating the stills on Runway. Generation itself works (the M0 test cost 8 credits at 1920:1080), but the images download from dnznrvs05pmza.cloudfront.net, which the network policy blocks (proxy 403). Tom needs to add it under Allowed domains. The first M0 render was lost because its task ID wasn't saved.
+- Script: scripts/runway_stills.py (M0 first, then `all`; it uses media/stills/M0.* as the @maya reference for shots with Maya, records task IDs in media/stills/tasks.json, and `--fetch` re-downloads finished tasks without new credits).
 
 ## Next steps (in order)
 1. Done (2026-10-13): image prompts, 17 stills plus a Maya reference. In the repo as docs/image-prompts.md and in Drive as the Google Doc "Flatline – 0% Image Prompts" (1n0Qnq3TwnBmtrLEqdNqWC6S2q1CrfvtV3R4TIwwuiCQ).
