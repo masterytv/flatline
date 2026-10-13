@@ -7,4 +7,4 @@ Music video project for the song "Flatline". The first video is "0%" (Maya, 19, 
 - Never commit the song, images or rendered video. Media lives in the Google Drive folder and in the git-ignored `media/` folder locally.
 - Never print or commit API keys. They come from the cloud environment's settings.
 - Motion graphics plus at most 20 AI still images. No AI video unless Tom asks for it.
-- Use the fictional app "LOOP" on screen; no real Instagram, TikTok or Apple UI.
+- Use the fictional app "TokTic" on screen (a deliberate jab at TikTok); no real Instagram, TikTok or Apple UI, and no TikTok colours or logo shapes.

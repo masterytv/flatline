@@ -89,7 +89,7 @@ Implications:
 ## 0% treatment (decided): Maya, 19, lives through her phone; the battery dies; she looks up and comes alive
 - Core trick: the first half plays as a phone screen recording (motion graphics UI). The phone frame shatters into full screen at the 1:24 "Flatline".
 - After the breakout, the real world is a flash "photo dump" of AI stills cut to the beat.
-- Use a fictional app called "LOOP". No real Instagram, TikTok or Apple UI or logos.
+- Use a fictional app called "TokTic" (Tom, 2026-10-13: a deliberate jab at TikTok; "LOOP" was dropped because it is a real app). No real Instagram, TikTok or Apple UI or logos, and keep TokTic's colours away from TikTok's cyan/red/black.
 - End card: "You don't have to die to wake up." Project Profound. Add 3–4 s after 3:32.
 - Formats: 16:9 master (phone frame in the center, expanding at the breakout) plus a 9:16 vertical. Cutdowns: 15 s (0:45–1:36) and 30 s.
 - Image style anchors:
@@ -153,7 +153,7 @@ Implications:
 ## Decisions (Tom, 2026-10-13)
 1. Images: Tom generates them himself from Claude's prompts and uploads them to the Drive folder.
 2. Maya: 19, black shoulder-length hair, modern club clothing, a dark, edgy, confident look. Keep the prompts stylish and tasteful, not sexualized; she's a young adult.
-   - LOOP app colors: Claude proposes them.
+   - TokTic app colors: Claude proposed them in docs/image-prompts.md (acid lime accent).
 3. Repo: Tom wants a new PRIVATE repo called "flatline" (GitHub account masterytv, a personal account).
    - Done: Tom created it, and Claude attached it with add_repo (access push) on 2026-10-13.
    - Never put mp3, images or rendered video in git: add them to .gitignore and keep media in Drive.
@@ -167,13 +167,19 @@ Implications:
 - Generated images may download from a different host than the API. If that host is blocked, name it to Tom so he can allow it too.
 
 ## Next steps (in order)
-1. Write the image prompts: about 16, in the two style anchors above, with Maya as described. Save them to Drive as a Google Doc and to the repo as docs/image-prompts.md, so Tom can start generating.
-2. Scaffold the Remotion project:
-   - Copy in the beat grid JSON and the lyric markers.
-   - Point browserExecutable at /opt/pw-browsers/chromium-1194 (check the exact binary path).
-   - Use local fonts (@fontsource via npm).
-3. Test render of the screen-world opening (0:00–1:24): phone UI, notifications, battery, scroll tunnel, crack. It needs no images. Send Tom a low-res preview with SendUserFile.
-4. When the images arrive: download from Drive (base64 tool-results file), then build the photo-dump and real-world sections.
+1. Done (2026-10-13): image prompts, 17 stills plus a Maya reference. In the repo as docs/image-prompts.md and in Drive as the Google Doc "Flatline – 0% Image Prompts" (1n0Qnq3TwnBmtrLEqdNqWC6S2q1CrfvtV3R4TIwwuiCQ).
+2. Done (2026-10-13): Remotion scaffold (see "Remotion build" below).
+3. Done (2026-10-13): first test render of the screen-world opening, 0:00 to 1:26.6 (it runs to the downbeat after the breakout so the shatter plays out). Images are procedural stand-ins. Waiting on Tom's notes.
+4. Tom: approve the image count and Runway cost (about 144 credits at 1080p, before retakes), or generate the stills himself. Then download them into public/stills/ named by ID; they replace the stand-ins automatically.
+5. Build drop 1 onwards: the photo dump, the kinetic type, the end card.
+
+## Remotion build
+- Commands: `npm install`, then `npm run studio` (live preview), `npm run typecheck`, `npm run render:opening-preview` (960×540) or `npm run render:opening` (1920×1080). The vertical version is the composition `ScreenOpeningVertical` (1080×1920). Add `--props='{"debug":true}'` for a timecode and bar counter in the corner.
+- Chromium: remotion.config.ts points at /opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell.
+- Song: download Flatline.mp3 from Drive into media/ and copy it to public/Flatline.mp3 (both git-ignored; a relative symlink breaks when Remotion copies public/). Without it, the render is silent.
+- Stills: put Tom's images in public/stills/ as <ID>_<name>.jpg/png/webp (e.g. S1_face_blue.png). `Still` in src/ui/Worlds.tsx uses the file when it exists and a procedural stand-in when it doesn't. public/stills is git-ignored via the image extensions.
+- Timing: src/timing.ts reads the beat grid; src/opening/cues.ts holds every cue in the 0:00–1:24 shot list, each snapped to the beat nearest Tom's lyric time, plus the battery schedule (23% → red 20% at 0:04 → 10% at the break → one step per bar → 1% at 0:55 → 0% at "Clear!").
+- Code map: src/opening/ScreenScenes.tsx (phone-screen scenes), src/opening/ScreenOpening.tsx (room, frame cracks, FLATLINE slam, shatter), src/ui/ (phone, status bar, TokTic logo, notifications, stand-in worlds), src/theme.ts (TokTic palette).
 
 ## Other context
 - Ageless (Rose and Walter) is the second video, planned for later. Its shot list is in the v2 Google Doc.
