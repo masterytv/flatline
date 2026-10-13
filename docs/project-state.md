@@ -20,6 +20,7 @@ After Tom's verdict, three treatments for 1:24.8 to the end card were pitched, p
   - Nothing from the old image set is used, the opening's stills included. Maya gets a new identity reference in the real-photo style (M1), and M1 is the reference for every Maya shot.
   - M0 is lost: it was never put in Drive, its Runway task ID was never saved (it came from a one-off model-comparison script), and Tom no longer has the copy he was sent. M1 is made from Maya's written description (Decisions, item 2) and Tom approves her face in the test batch before any other Maya shot is generated.
   - Pacing: a visual change at least every 2 beats almost everywhere and every beat in the drops, with only short, deliberate holds.
+- **Shot list proposed (2026-10-13, waiting on Tom):** docs/shot-list.md (the story, the places, a cut plan with 347 visual changes, and an index of 83 images: 2 references, 27 for the opening, 54 for Print) and docs/image-prompts.md (every prompt). 83 images plus a 10% retake reserve is 92 × 6 = 552 credits, which is 282 more than the 270 left; the references plus the test batch (36 credits) fit now.
 
 ## Where things are
 - Google Drive folder (Claude's working folder): 1S4kGIm8W8tyQuCnGBZNV8zWEq3DYxMqJ
