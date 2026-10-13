@@ -1,4 +1,4 @@
-"""Generate the 0% stills on Runway (gen4_image) from docs/image-prompts.md.
+"""Generate the 0% stills on Runway (default model nano_banana_2.1; see MODEL) from docs/image-prompts.md.
 
 Usage: python3 scripts/runway_stills.py M0            # the Maya reference
        python3 scripts/runway_stills.py S1 R3 ...     # specific stills

@@ -1,5 +1,12 @@
 # 0% music video (song: Flatline): project state
 
+## Status at handoff (2026-10-13, read this first)
+- Tom on the full first cut: "This is mediocre at best. My idea for the images made everything look AI generated. Too many of the photos are repeated over and over." The 0:00–1:24 phone opening was liked; drop 1 to the end card needs a new treatment.
+- Superseded below: the stills are no longer made by Tom in his own tool. Claude generates them on Runway (scripts/runway_stills.py, model nano_banana_2.1, 6 credits each, about 270 credits left) and sends Tom JPEGs; api.dev.runwayml.com and dnznrvs05pmza.cloudfront.net are both allowed now, and the Drive tools work.
+- Images used so far: M0 (reference, not in the edit), S1–S6 and R3–R14, so 18 in the edit (19 with M0; R1 and R2 were generated and cut). Ask Tom how the 20-image cap counts before generating more.
+- The "editorial fashion photographer, Edison-bulb loft" style in docs/image-prompts.md is what Tom called AI-looking; don't reuse it as is.
+- A new container has no media: download Flatline.mp3 and the stills from the Drive folder (Tom uploads the JPEGs he was sent).
+
 ## Where things are
 - Google Drive folder (Claude's working folder): 1S4kGIm8W8tyQuCnGBZNV8zWEq3DYxMqJ
   - Flatline.mp3: 1YQoac_93cuQ0tZYHAwsNbaOykf0kOfmE (the link Tom first sent, 1NU72tFT..., is "It Was You.mp3")
