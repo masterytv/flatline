@@ -207,7 +207,7 @@ def main():
     ps = prompts()
     args = sys.argv[1:]
     cap = None
-    while args and args[0].startswith('--') and args[0] != '--fetch':
+    while args and args[0].startswith('--') and args[0] not in ('--fetch', '--edit'):
         if args[0] == '--model':
             MODEL, args = args[1], args[2:]
         elif args[0] == '--cap':
