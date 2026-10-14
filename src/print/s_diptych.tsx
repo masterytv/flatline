@@ -8,12 +8,13 @@ import {Cam, Plate, Sheet} from './press';
 import {CamLayer, Paper, Press, SheetCanvas} from './Press';
 
 // 2:52.8 to 3:07.8, build 3: the walk back (bars 93 to 101.1).
-// Diptych: the zine, before and after. P34 (earlier, lit by her phone) printed cold on the left page; the
-//   sentence runs across the fold, its three dots stamp onto the blank right page one per beat, then P35 (now,
-//   under a streetlight) is pulled onto it in orange and black; a page turn lands P36 (the five walking home) across
-//   the spread.
-// Hoist: the same lyric goes public as fly-posters on a pale wall. P37 (Dev, arms down) with a FLATLINE snipe,
-//   MY HEART / STOPPED stamped on the wall, P38 (Jess, arms out), P39 (Kai, arms rising) with an AND I STARTED
+// Diptych: the zine, before and after. P34 (earlier, lit by her phone) printed cold on the left page; a flat cold
+//   rule under 'my heart stopped' runs to the fold, the three dots step onto the blank right page one per beat
+//   (cold, the two inks overprinted, heat), then P35 (now, under a streetlight) is pulled onto it in orange and
+//   black; a page turn lands P36 (the five walking home) across the spread.
+// Hoist: the same lyric goes public as fly-posters on a pale wall, the type going from black to orange as she comes
+//   alive. P37 (Dev, arms down) with a FLATLINE snipe, MY HEART / STOPPED stamped black on the wall (its heat beats
+//   once more off register), P38 (Jess, arms out), P39 (Kai, arms rising) with an AND I STARTED
 //   snipe, then P40 (Maya, arms fully up) hoisted through the swell with her plates drifting out of register, a
 //   DANCING snipe, and the snap into register on the final-drop downbeat.
 
@@ -196,13 +197,38 @@ const RIGHT_IMG = {x: GUT + 60, y: IMG_TOP}; // 1020..1740
 const CAP1 = 870; // caption baseline, line 1
 const CAP2 = 985; // line 2
 const CAP_SIZE = 80;
-const DOT_D = 34;
-const DOT_X = [GUT + 86, GUT + 152, GUT + 218];
-const STARTED_X = GUT + 266;
+const DOT_D = 40;
+const DOT_X = [GUT + 82, GUT + 152, GUT + 222];
+const STARTED_X = GUT + 268;
+const RULE_Y = CAP1 + 38; // the flat rule under 'my heart stopped', below the descenders
+
+/**
+ * The three dots cross from the screen world into real life: the first in cold, the second the two inks
+ * overprinted a little out of register (plum, with a fringe of each), the third in heat, the ink of 'and I started'.
+ * Coordinates in the svg's own px; `s` scales each dot (its stamp).
+ */
+const Dots: React.FC<{x0: number; y: number; n: number; s?: (i: number) => number}> = ({x0, y, n, s = () => 1}) => (
+	<>
+		{DOT_X.slice(0, n).map((x, i) => {
+			const r = (DOT_D / 2) * s(i);
+			const cx = x - GUT + x0;
+			const blend: React.CSSProperties = {mixBlendMode: 'multiply'};
+			if (i === 0) return <circle key={i} cx={cx} cy={y} r={r} fill={INK.cold} />;
+			if (i === 2) return <circle key={i} cx={cx} cy={y} r={r} fill={INK.heat} />;
+			return (
+				<g key={i}>
+					<circle cx={cx - 3} cy={y + 2} r={r} fill={INK.cold} style={blend} />
+					<circle cx={cx + 3} cy={y - 2} r={r} fill={INK.heat} style={blend} />
+				</g>
+			);
+		})}
+	</>
+);
 
 const Z = {
 	slam: bt(93), // 172.815 'Flatline': the zine slams open, P34 cold on the left, FLATLINE across the spread
 	caption: bt(93, 3), // 173.732 'my heart stopped'; the stamp lifts
+	rule: bt(93, 4), // 174.184 the flat rule draws under it to the fold
 	dots: [bt(94), bt(94, 2), bt(94, 3)], // 174.626, 175.078, 175.543
 	orange: bt(95), // 176.448 P35 orange pull, 'and I started'
 	black: bt(95, 3), // 177.377 black pull, 'dancing'
@@ -229,7 +255,7 @@ const ZINE_MOVES: Move[] = [
 	{t: Z.turn, to: pose(960, 540, 1), dur: 0.1},
 	{t: bt(96, 2), to: pose(1010, 560, 1.09), dur: 0.2},
 	{t: Z.black2, to: pose(1010, 556, 1.12), dur: 0.3},
-	{t: bt(96, 4), to: pose(1440, 600, 1.34), dur: 0.18}, // in on Maya at the end of the line, into the cut
+	{t: bt(96, 4), to: pose(1180, 420, 1.36), dur: 0.18}, // in on their heads (Sam laughing on Dev's back, Maya at the right), into the cut
 ];
 
 /** The spread lands on the table: 1.05 to 1 in 3 frames. */
@@ -261,7 +287,7 @@ const p36Plates = (t: number, kPull: number): Plate[] => {
 	const [hx, hy] = kickNudge(t, 1, 3);
 	const [kx, ky] = kickNudge(t, 0, 1.5);
 	// orange alone would flood the night street, so it is opened up a little (gamma)
-	const plates: Plate[] = [{ch: 1, ink: INK.heat, angle: 15, cell: 8.5, gamma: 1.2, dx: 2 + hx, dy: -1 + hy}];
+	const plates: Plate[] = [{ch: 1, ink: INK.heat, angle: 15, cell: 8.5, gamma: 1.5, dx: 2 + hx, dy: -1 + hy}];
 	if (kPull > 0) plates.push({ch: 0, ink: INK.key, angle: 45, cell: 8.5, pull: kPull, pullY: true, gain: 0.85, gamma: 1.3, dx: kx, dy: ky});
 	return plates;
 };
@@ -323,9 +349,7 @@ const RightPageFace: React.FC<{d: Record<string, Density>; t: number; res: numbe
 			<CropMarks x={RIGHT_IMG.x - GUT} y={RIGHT_IMG.y - SPREAD.y} w={IMG_W} h={IMG_H} gap={10} len={26} />
 			<Slug x={RIGHT_IMG.x - GUT} y={22} text="13 · AFTER · 2:52 AM · THE WALK HOME" size={14} />
 			<WorldSvg box={[0, 0, SPREAD.w / 2, SPREAD.h]}>
-				{DOT_X.map((x, i) => (
-					<circle key={i} cx={x - GUT} cy={CAP1 - SPREAD.y - DOT_D / 2} r={DOT_D / 2} fill={INK.key} />
-				))}
+				<Dots x0={0} y={CAP1 - SPREAD.y - DOT_D / 2} n={3} />
 				<text x={STARTED_X - GUT} y={CAP1 - SPREAD.y} fontFamily={SERIF} fontStyle="italic" fontSize={CAP_SIZE} fill={INK.heat}>
 					and I started
 				</text>
@@ -460,13 +484,15 @@ export const Diptych: React.FC<{t: number}> = ({t}) => {
 								</WorldSvg>
 							)}
 							{/* the dots: the sentence steps over the fold onto the blank page, one per beat */}
-							{!turning && (
+							{!turning && t >= Z.dots[0] && (
 								<WorldSvg box={[0, 0, 1920, 1080]} style={inked(300, 40, 0, true)}>
-									{Z.dots.map((b, i) => {
-										if (t < b) return null;
-										const s = stamp(t, b).s * (1 + 0.25 * Math.exp(-(t - b) / 0.05));
-										return <circle key={i} cx={DOT_X[i]} cy={CAP1 - DOT_D / 2} r={(DOT_D / 2) * s} fill={INK.key} />;
-									})}
+									<Dots x0={GUT} y={CAP1 - DOT_D / 2} n={Z.dots.filter((b) => t >= b).length} s={(i) => stamp(t, Z.dots[i]).s * (1 + 0.25 * Math.exp(-(t - Z.dots[i]) / 0.05))} />
+								</WorldSvg>
+							)}
+							{/* 93.4: the flat rule runs under the caption to the fold, where the dots will pick it up */}
+							{t >= at(Z.rule) && (
+								<WorldSvg box={[0, 0, 1920, 1080]} style={inked(600, 3, 29)}>
+									<line x1={LEFT_IMG.x} y1={RULE_Y} x2={lerp(LEFT_IMG.x, GUT - 16, easeOut((t - at(Z.rule)) / 0.2))} y2={RULE_Y} stroke={INK.cold} strokeWidth={5} />
 								</WorldSvg>
 							)}
 							{/* the right page's words, printed by the two pulls */}
@@ -600,9 +626,9 @@ const PFOOT = 40;
 
 type Poster = {id: string; cx: number; cy: number; rot: number; t0: number; label: string};
 const WALL: Poster[] = [
-	{id: 'P37', cx: 360, cy: 530, rot: -1.8, t0: H.flat, label: 'P37 · DEV · ARMS DOWN'},
-	{id: 'P38', cx: 2060, cy: 520, rot: 1.4, t0: H.p38, label: 'P38 · JESS · ARMS OUT'},
-	{id: 'P39', cx: 2700, cy: 545, rot: -1.0, t0: H.started, label: 'P39 · KAI · ARMS RISING'},
+	{id: 'P37', cx: 360, cy: 530, rot: -1.8, t0: H.flat, label: '01/04 · DEV · 3:00 AM · ARMS DOWN'},
+	{id: 'P38', cx: 2060, cy: 520, rot: 1.4, t0: H.p38, label: '02/04 · JESS · 3:01 AM · ARMS OUT'},
+	{id: 'P39', cx: 2700, cy: 545, rot: -1.0, t0: H.started, label: '03/04 · KAI · 3:03 AM · ARMS UP'},
 ];
 const HERO = {id: 'P40', cx: 3560, w: 680, h: 975, cy: 515}; // Maya, hoisted; cy is where she ends up
 
@@ -614,7 +640,8 @@ const inBox = (id: string, u: number, v: number, cx: number, cy: number, w: numb
 // Dev's face in P37 (u 0.50, v 0.29, read off the photo); Jess's and Maya's from their prompts (centred, knees up)
 const DEV_FACE = inBox('P37', 0.5, 0.29, 360, 530, 600, 860);
 const JESS_FACE = inBox('P38', 0.5, 0.25, 2060, 520, 600, 860); // PROVISIONAL until P38 exists
-const MAYA_FACE = inBox('P40', 0.5, 0.22, 3560, 515, 680, 975); // PROVISIONAL until P40 exists
+// knees up with her arms fully up and her hands just under the top edge (the prompt): her face near v 0.27
+const MAYA_FACE = inBox('P40', 0.5, 0.27, 3560, 515, 680, 975); // PROVISIONAL until P40 exists
 
 /** The heart block on the wall, both lines set to the same measure (MY HEART 3.695 em, STOPPED 3.192 em). */
 const MH = {x: 880, w: 836, base1: 352};
@@ -640,8 +667,8 @@ const HOIST_MOVES: Move[] = [
 	{t: H.dancing, to: pose(3140, 525, 0.96), dur: 0.08}, // AND I STARTED / DANCING on one line
 	// the swell: a push a beat into her, the plates sliding further apart
 	{t: bt(100, 2), to: pose(3300, 470, 1.1), dur: 0.12},
-	{t: H.widest, to: pose(3430, 420, 1.25), dur: 0.12},
-	{t: bt(100, 4), to: pose(MAYA_FACE[0], MAYA_FACE[1] + 140, 1.42), dur: 0.12},
+	{t: H.widest, to: pose(3470, 480, 1.25), dur: 0.12}, // her and DANCING, the plates furthest apart
+	{t: bt(100, 4), to: pose(MAYA_FACE[0], MAYA_FACE[1], 2.05), dur: 0.1}, // the last beat of the swell: tight on her face and arms
 	{t: H.snap, to: pose(3480, 525, 1), dur: 0.05}, // the drop: out to the whole poster, in register, taped up
 ];
 
@@ -815,6 +842,7 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P37', 'P38', 'P39', 'P40'].map((id) => photo(id).map));
 	const cam = hoistCam(t);
 	const kick = t >= H.kick ? Math.exp(-(t - H.kick) / 0.14) : 0;
+	const drift = driftAt(t);
 
 	// the wall posters
 	const live = WALL.filter((p) => t >= p.t0);
@@ -830,7 +858,6 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 	// Maya, hoisted
 	const heroOn = t >= H.started;
 	const hy = heroY(t);
-	const drift = driftAt(t);
 	const pasted = t >= H.snap ? slap(t, H.snap) : null;
 	const sway = t < H.snap ? Math.sin((t - H.started) * 5.1) * 0.9 * (1 - clamp01((t - H.dancing) / 1.2) * 0.6) : 0;
 	const heroS = pasted ? pasted.s : 1;
@@ -842,7 +869,9 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 	// type
 	const flatSt = stamp(t, H.flat);
 	const heartSt = stamp(t, H.heart);
-	const [sx, sy] = kickNudge(t, 4, 6, H.heart + 0.3, H.p38); // STOPPED's heat beats once more, off register, on 97.4
+	// STOPPED is black (the heart has stopped); its heat beats once more off register on 97.4, and again on the kick
+	const ghostAt = (b: number, until: number) => (t >= b && t < until ? Math.exp(-(t - b) / 0.13) : 0);
+	const ghost = Math.max(ghostAt(bt(97, 4), H.p38), ghostAt(H.kick, H.started));
 	const startedSt = stamp(t, H.started);
 	const dancingSt = stamp(t, H.dancing);
 	const rot40 = (sway * Math.PI) / 180;
@@ -886,9 +915,16 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 							</text>
 						</g>
 						<g transform={about(MH.x, MH_BASE2, heartSt.s)}>
-							<text x={MH.x + sx} y={MH_BASE2 + sy} fontFamily="Anton" fontSize={MH_S2} fill={INK.heat}>
+							<text x={MH.x} y={MH_BASE2} fontFamily="Anton" fontSize={MH_S2} fill={INK.key}>
 								STOPPED
 							</text>
+							{ghost > 0.03 && (
+								<g transform={about(MH.x + MH.w / 2, MH_BASE2, 1 + 0.035 * ghost)} style={{mixBlendMode: 'multiply'}}>
+									<text x={MH.x + 16 * ghost} y={MH_BASE2 - 10 * ghost} fontFamily="Anton" fontSize={MH_S2} fill={INK.heat}>
+										STOPPED
+									</text>
+								</g>
+							)}
 						</g>
 					</WorldSvg>
 				)}
@@ -906,7 +942,7 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 						rot={sway}
 						s={heroS}
 						shadow={heroShadow}
-						label={`P40 · MAYA · REGISTER ${drift >= 0.5 ? '+' + Math.round(drift) + ' PX' : 'OK'}`}
+						label={`04/04 · MAYA · REGISTER ${drift >= 0.5 ? '+' + Math.round(drift) + ' PX' : 'OK'}`}
 						wet={pasted ? 1 - clamp01((t - H.snap) / 0.4) : 0}
 					/>
 				)}

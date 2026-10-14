@@ -5,7 +5,7 @@ import {beatsIn, bt, pulse} from '../timing';
 import {TokTicLogo} from '../ui/TokTicLogo';
 import {Density, useDensities} from './density';
 import {ANTON, INK, MONO, SERIF} from './ink';
-import {clamp01, CropMarks, easeIn, easeInOut, easeOut, inked, kickNudge, lerp, stamp} from './kit';
+import {clamp01, CropMarks, easeIn, easeOut, inked, kickNudge, lerp, stamp} from './kit';
 import {Poly} from './masks';
 import {Cam, CAM0, Plate, Sheet, sheetMatrix} from './press';
 import {CamLayer, PaperFill, Press} from './Press';
@@ -376,14 +376,20 @@ const frontAt = (b: Bat, t: number, dur = 0.12) => {
 	return lerp(frontX(b, n - 1), frontX(b, n), outBack((t - b.times[n - 1]) / dur, 1.3));
 };
 
-/** Where battery i sits in the world at t: alone in its own shot; in the stack, 2 and 1 drop onto 3. */
-const LAND = [STK + 0.27, STK + 0.17, STK];
+/**
+ * Where battery i sits in the world at t: alone in its own shot; in the stack, 2 and 1 fall onto 3 while the camera
+ * pulls out (they start falling out of shot), 2 landing a frame before the 91.1 downbeat and 1 on it (thunk, thunk),
+ * so the downbeat frame is the whole stack, still shaking.
+ */
+const LAND = [STK, STK - 1 / 30, STK];
+const FALL0 = STK - 0.2;
+const DROP = 760; // world px they fall
 const place = (i: number, t: number): {x: number; y: number; rot: number} => {
 	const b = BATS[i];
-	if (t < STK) return {x: 960, y: b.y, rot: 0};
-	const rk = easeOut((t - STK) / 0.3);
-	const k = LAND[i] > STK ? clamp01((t - STK) / (LAND[i] - STK)) : 1;
-	return {x: 960, y: b.y - 1500 * (1 - k * k), rot: b.stackRot * rk};
+	if (t < ZOOM0) return {x: 960, y: b.y, rot: 0};
+	const rk = easeOut((t - STK) / 0.2);
+	const k = i < 2 ? clamp01((t - FALL0) / (LAND[i] - FALL0)) : 1;
+	return {x: 960, y: b.y - DROP * (1 - k * k), rot: b.stackRot * rk};
 };
 
 /** The battery shots' camera (world space), before the per-kick push and the landing shakes. */
@@ -401,18 +407,20 @@ const baseCam = (t: number): Cam => {
 		// battery 2: a fast pan along the faces as it charges twice as fast; out wide on the last half-beat
 		const k = clamp01((t - C2[0]) / (C2[7] - C2[0]));
 		const out = outBack((t - C2[7]) / 0.17, 1.4);
-		return {cx: 960 + lerp(lerp(-300, 320, k), 25, out), cy: y2 + lerp(-235, -22, out), s: lerp(1.55, 0.99, out), rot: lerp(2.5, 0, out)};
+		// (the faces sit at the battery's mid-height: the shot centres a little above them so the readout fits on top)
+		return {cx: 960 + lerp(lerp(-300, 320, k), 25, out), cy: y2 + lerp(-190, -22, out), s: lerp(1.35, 0.99, out), rot: lerp(2.5, 0, out)};
 	}
 	if (t < ZOOM0) {
 		// battery 3: a step closer on every beat of the bar, the tilt flipping
 		const i = Math.max(0, countAt(beatTimes(bt(90), bt(91)), t) - 1);
 		return {cx: 960 + [10, -20, 90, 200][i], cy: y3 + [-17, -17, -128, -150][i], s: [0.99, 1.1, 1.23, 1.38][i], rot: [3, -2, 2, -3][i]};
 	}
-	// 91.1: out to the stack (outBack, leaving two frames early so the downbeat frame already has the stack), a punch on 91.4
+	// 91.1: out to the stack (outBack, leaving two frames early so the downbeat frame already has the stack); a punch on
+	// every bolt, the hardest on 91.4
 	const from = baseCam(ZOOM0 - 1e-3);
-	const e = outBack((t - ZOOM0) / 0.22, 1.2);
-	const to: Cam = {cx: 1000, cy: y2, s: 0.535, rot: 0};
-	const punch = 1 + 0.06 * decay(t, BOLTS[3], 0.12);
+	const e = outBack((t - ZOOM0) / 0.15, 1.2);
+	const to: Cam = {cx: 1000, cy: y2, s: 0.5, rot: 0};
+	const punch = 1 + 0.03 * decay(t, BOLTS[1], 0.1) + 0.03 * decay(t, BOLTS[2], 0.1) + 0.06 * decay(t, BOLTS[3], 0.12);
 	// scale interpolated in log space, so the pull-out reads as one even move
 	const s = Math.exp(lerp(Math.log(from.s), Math.log(to.s), e));
 	return {cx: lerp(from.cx, to.cx, e), cy: lerp(from.cy, to.cy, e), s: s * punch, rot: lerp(from.rot ?? 0, 0, e)};
@@ -423,7 +431,7 @@ const camAt = (t: number): Cam => {
 	const kick = 1 + 0.018 * pulse(t, 0.09);
 	// landing shakes: batteries 2 and 1 dropping onto the stack
 	let sh = 0;
-	for (const t0 of [LAND[1], LAND[0]]) if (t >= t0) sh += 16 * decay(t, t0, 0.05);
+	for (const t0 of [LAND[1], LAND[0]]) if (t >= t0) sh += 14 * decay(t, t0, 0.05);
 	return {...c, cx: c.cx + sh * 0.7, cy: c.cy - sh, s: c.s * kick};
 };
 
@@ -518,7 +526,7 @@ const Dress: React.FC<{b: Bat; t: number; from: number}> = ({b, t, from}) => {
 				<div style={{fontFamily: MONO, fontSize: 25, lineHeight: 1.6, letterSpacing: '0.14em', color: INK.key, mixBlendMode: 'multiply', textAlign: 'right'}}>
 					{b.slug}
 					<br />
-					{`CELL ${String(n).padStart(2, '0')}/${b.times.length} · CHARGING`}
+					{`CELL ${String(n).padStart(2, '0')}/${b.times.length} · ${n >= b.times.length ? 'CHARGED' : 'CHARGING'}`}
 				</div>
 			</Anchor>
 			<div style={{position: 'absolute', left: 0, top: 0}}>
@@ -577,11 +585,11 @@ const Slam: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 /** 85.4 to 92.1: the batteries. */
 const Batteries: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 	const cam = camAt(t);
-	const shown = t < C2[0] ? [0] : t < C3[0] ? [1] : t < STK ? [2] : [0, 1, 2];
+	const shown = t < C2[0] ? [0] : t < C3[0] ? [1] : t < ZOOM0 ? [2] : [0, 1, 2];
 	const cell = cam.s < 0.75 ? 12 : 6.5;
 	const sheets = shown.flatMap((i) => cellSheets(BATS[i], i, d, t, cell));
 	const knock = easeOut((t - EMPTY) / 0.1);
-	const stacked = t >= STK;
+	const stacked = t >= ZOOM0;
 	return (
 		<AbsoluteFill>
 			<PaperFill />
@@ -658,10 +666,14 @@ const bandCrop = (b: Bat, r: Rect, vc: number, z: number): [number, number, numb
 const Triptych: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 	const cam = camAt(TRIP - 1e-3);
 	const kick = 1 + 0.018 * pulse(t, 0.09);
-	const e = easeInOut((t - TRIP) / 0.3);
+	// 92.1: the three interiors snap open into full-width bands (outBack: most of the way there on the downbeat frame);
+	// the cells' gaps close and the casings stretch thin and vanish as they go
+	const x = (t - TRIP) / 0.14;
+	const e = outBack(x, 1.1);
+	const shut = easeOut(x);
 	const q = easeIn((t - COLLAPSE) / 0.2);
-	const fallT = t - TRIP;
 	const sheets: Sheet[] = [];
+	const casings: {r: Rect; rot: number}[] = [];
 	BATS.forEach((b, i) => {
 		// start: the battery interior on screen at the stack
 		const [sx, sy] = camPoint(cam, 960, b.y);
@@ -676,18 +688,19 @@ const Triptych: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => 
 		}
 		if (r.h < 14) return;
 		const bandV = (b.band[1] + b.band[3]) / 2;
-		const vc = lerp(bandV, b.tri, e);
+		const vc = lerp(bandV, b.tri, clamp01(e));
 		const zk = easeOut((t - PUSHES[i]) / 0.11);
 		const z = 1 + 0.75 * zk;
-		const fresh = t >= PUSHES[i] ? decay(t, PUSHES[i], 0.07) : 0;
+		// fresh heat floods each band as it snaps open (the charge going in), and again on its push
+		const fresh = Math.max(decay(t, TRIP, 0.09), t >= PUSHES[i] ? decay(t, PUSHES[i], 0.07) : 0);
 		const [cu0, cv0, cu1, cv1] = bandCrop(b, r, vc, z);
 		const rot = lerp(place(i, TRIP).rot, 0, e) + (cam.rot ?? 0) * (1 - e);
 		const cxr = r.x + r.w / 2;
 		const cyr = r.y + r.h / 2;
-		if (e < 1) {
-			// the cells close up as the band widens
+		if (shut < 0.995) {
+			casings.push({r, rot});
 			const n = b.times.length;
-			const gap = b.gap * cam.s * (1 - e);
+			const gap = b.gap * cam.s * (1 - shut);
 			const cw = (r.w - (n - 1) * gap) / n;
 			const rr = (rot * Math.PI) / 180;
 			for (let c = 0; c < n; c++) {
@@ -703,7 +716,7 @@ const Triptych: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => 
 					cx: cxr + lx * Math.cos(rr),
 					cy: cyr + lx * Math.sin(rr),
 					rot,
-					plates: warm(t, 7, 60 + i),
+					plates: warm(t, 7, 60 + i, fresh),
 					seed: 70 + i * 20 + c,
 				});
 			}
@@ -711,22 +724,31 @@ const Triptych: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => 
 			sheets.push({map: d[b.id], crop: [cu0, cv0, cu1, cv1], w: r.w, h: r.h, cx: cxr, cy: cyr, s: kick * (t >= PUSHES[i] ? stamp(t, PUSHES[i]).s : 1), plates: warm(t, 7.5, 60 + i, fresh), seed: 90 + i});
 		}
 	});
-	const fall = 0.5 * 5200 * fallT * fallT;
 	const flat = clamp01((q - 0.5) / 0.5);
+	const pad = PAD * cam.s * (1 - shut);
+	const stroke = STROKE * cam.s * (1 - shut);
 	return (
 		<AbsoluteFill>
 			<PaperFill />
 			<Press sheets={sheets} />
-			{fallT < 0.6 && (
-				<CamLayer cam={cam}>
-					{BATS.map((b, i) => (
-						<Casing key={i} b={b} i={i} t={TRIP - 1e-3} dy={(fall / cam.s) * (1 + 0.12 * i)} drot={fallT * [-30, 24, -18][i]}>
-							<StackDress i={i} t={TRIP - 1e-3} />
-						</Casing>
-					))}
-				</CamLayer>
-			)}
-			{fallT < 0.6 && <BigBolt t={TRIP} fall={fall * 1.1} />}
+			{casings.map(({r, rot}, i) => (
+				<div
+					key={i}
+					style={{
+						position: 'absolute',
+						left: r.x - pad,
+						top: r.y - pad,
+						width: r.w + 2 * pad,
+						height: r.h + 2 * pad,
+						transform: `rotate(${rot}deg)`,
+						border: `${stroke}px solid ${INK.key}`,
+						borderRadius: RAD * cam.s * (1 - shut),
+						boxSizing: 'border-box',
+						mixBlendMode: 'multiply',
+						...inked(1100, 7 * i, 3 * i, true),
+					}}
+				/>
+			))}
 			{/* the flat Rule: what is left of the night when it is squeezed flat, ready for 'Flatline' */}
 			{q > 0.5 && <div style={{position: 'absolute', left: 0, top: 540 - lerp(14, 3.5, flat), width: 1920, height: lerp(28, 7, flat), background: INK.key, mixBlendMode: 'multiply', ...inked(1024, 0, 0, true)}} />}
 		</AbsoluteFill>
