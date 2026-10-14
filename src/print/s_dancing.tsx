@@ -128,6 +128,8 @@ export const DancingWord: React.FC<{t: number}> = ({t}) => {
 	const ws = z * slam.s * (1 + 0.035 * pulse * (1 - x));
 	const jx = t >= bt(55, 3) && t < bt(55, 4) ? (hash2(i, 1, 9) - 0.5) * 22 * Math.exp(-since / 0.09) : 0;
 	const word = `translate(${NC_GAP.x + jx} ${NC_GAP.y}) scale(${ws}) translate(${-NC_GAP.x} ${-NC_GAP.y})`;
+	// the trap stays a thin paper line on screen as the word flies at us (scaled with the word it became 400 px cream bands)
+	const rimW = (2 * RIM * (1 + 0.5 * clamp01((ws - 1) / 8))) / ws;
 	const svgBox: React.CSSProperties = {position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible'};
 	return (
 		<AbsoluteFill style={{background: INK.paper}}>
@@ -139,7 +141,7 @@ export const DancingWord: React.FC<{t: number}> = ({t}) => {
 			<svg viewBox="0 0 1920 1080" style={svgBox}>
 				<g transform={word}>
 					{DANCING_PATHS.map((p, n) => (
-						<path key={n} d={p} fill="none" stroke={INK.paper} strokeWidth={RIM * 2} strokeLinejoin="round" />
+						<path key={n} d={p} fill="none" stroke={INK.paper} strokeWidth={rimW} strokeLinejoin="round" />
 					))}
 				</g>
 			</svg>
@@ -150,7 +152,7 @@ export const DancingWord: React.FC<{t: number}> = ({t}) => {
 						<rect x={0} y={0} width={1920} height={1080} fill="white" />
 						<g transform={word}>
 							{DANCING_PATHS.map((p, n) => (
-								<path key={n} d={p} fill="black" stroke="black" strokeWidth={RIM * 2} strokeLinejoin="round" />
+								<path key={n} d={p} fill="black" stroke="black" strokeWidth={rimW} strokeLinejoin="round" />
 							))}
 						</g>
 					</mask>
@@ -251,7 +253,9 @@ const pileCam = (t: number): Cam => beatHit(track(t, MOVES), t, bt(56));
 
 const platesFor = (n: number, t: number): Plate[] => {
 	const [kx, ky] = kickNudge(t, 0, 2);
-	const [hx, hy] = kickNudge(t, 1, 2.5);
+	// beats 2 and 4 carry no cut, so the press thumps harder there: the orange plate kicks out and settles
+	const offBeat = BEATS[Math.max(0, lastBeatIndex(t))].beat % 2 === 0;
+	const [hx, hy] = kickNudge(t, 1, offBeat ? 5 : 2.5);
 	switch (n) {
 		case 0: {
 			// the burst lands with the orange plate flung off register, snapping in over a few frames
@@ -350,8 +354,15 @@ export const FirstDance: React.FC<{t: number}> = ({t}) => <Pile t={t} />;
 /* ----------------------------------------------------------------------------------------------------- */
 /* REVERSE PULL (114.265 to 116.100)                                                                      */
 
-/** P7 as the couch stencils print it at 116.100 (same sheet, same place: see s_couch.tsx). */
+/**
+ * P7 as the couch stencils print it at 116.100: the same sheet in the same place, uncropped (2752:1536), on a still
+ * camera. s_couch.tsx should import P7_SHEET and P7_COLD so the line screen it peels back to is the one seen through
+ * the letters here, line for line.
+ */
 export const P7_SHEET = {w: 1760, h: 982, cx: 960, cy: 520};
+/** The screen-world plate the couch starts from: ultramarine 75° line screen, cell 7 (seed 5 on the sheet). */
+export const P7_COLD: Plate = {ch: 2, ink: INK.cold, angle: 75, cell: 7, kind: 'line', gain: 0.82};
+export const P7_SEED = 5;
 
 // FLATLINE exactly as kit's FlatlineBar sets it here (Anton 430, letter-spacing 0.04 em, centred on x 960,
 // baseline 694.8), flattened from the font's outlines to polygons in frame px (checked against a render: within 2 px).
@@ -413,8 +424,8 @@ const flatAt = (x: number, y: number) => {
 const p7Cold = (map: Density): Sheet => ({
 	map,
 	...P7_SHEET,
-	seed: 5,
-	plates: [{ch: 2, ink: INK.cold, angle: 75, cell: 7, kind: 'line', gain: 0.82, mask: (u, v) => flatAt(P7_SHEET.cx + (u - 0.5) * P7_SHEET.w, P7_SHEET.cy + (v - 0.5) * P7_SHEET.h)}],
+	seed: P7_SEED,
+	plates: [{...P7_COLD, mask: (u, v) => flatAt(P7_SHEET.cx + (u - 0.5) * P7_SHEET.w, P7_SHEET.cy + (v - 0.5) * P7_SHEET.h)}],
 });
 
 const THUMPS = [bt(61, 2), bt(61, 4)];
