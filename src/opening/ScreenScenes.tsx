@@ -457,7 +457,9 @@ const KAI_THUMB = {x: 16, y: 434, w: 220, h: 294};
 const KaiPhoto: React.FC<{t: number}> = ({t}) => {
 	if (t < CHAT.fill) return null;
 	const e = ramp(t, CHAT.fill, CHAT.fill + 0.3, Easing.out(Easing.cubic));
-	const push = 1 + 0.06 * ramp(t, CHAT.fill, T.fly, Easing.linear);
+	// Tom: zoom past the friend in the foreground so Maya sits between Jess and Dev, who are talking.
+	// The push pivots on Maya (u 0.52, v 0.45 in O7) and lands as the control centre drops.
+	const push = (1 + 1.4 * ramp(t, CHAT.fill + 0.08, T.dnd - 0.03, Easing.inOut(Easing.cubic))) * (1 + 0.05 * ramp(t, T.dndTap, T.fly, Easing.linear));
 	const chrome = ramp(t, CHAT.fill + 0.2, CHAT.fill + 0.4);
 	return (
 		<div
@@ -473,7 +475,7 @@ const KaiPhoto: React.FC<{t: number}> = ({t}) => {
 				zIndex: 10,
 			}}
 		>
-			<AbsoluteFill style={{transform: `scale(${push})`}}>
+			<AbsoluteFill style={{transform: `scale(${push})`, transformOrigin: '52% 45%'}}>
 				<Still id={CHAT.kaiPhoto} fallback={<FaceWorld t={t} />} />
 			</AbsoluteFill>
 			<AbsoluteFill style={{opacity: chrome}}>

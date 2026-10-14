@@ -4,6 +4,7 @@ Usage: python3 scripts/runway_stills.py M1 C1          # the two identity refere
        python3 scripts/runway_stills.py P7 P1 ...      # specific stills
        python3 scripts/runway_stills.py all            # every still in the doc that isn't on disk yet
        python3 scripts/runway_stills.py --fetch P7 ..  # re-download finished tasks, no new credits
+       python3 scripts/runway_stills.py --edit edits.json  # edit stills in place: [{"id": "O4", "instruction": "..."}]
        python3 scripts/runway_stills.py --model gpt_image_2 M1   # another image model on the account
        python3 scripts/runway_stills.py --cap 2000 ... # stop before total spend passes 2000 credits ($20)
 
@@ -156,6 +157,29 @@ def generate(sid, text, cap):
     return download(sid, url) + f' [{len(body.get("referenceImages", []))} refs, balance was {before}]'
 
 
+def edit(sid, instruction, cap):
+    """Edit an existing still in place: same photo, same framing, one change."""
+    with LOCK:
+        if cap is not None and spent() + 6 > cap:
+            raise RuntimeError(f'skipped: total spend would pass the {cap}-credit cap ({spent()} spent)')
+    f = on_disk(sid)
+    if not f:
+        raise RuntimeError(f'{sid} is not in media/stills')
+    text = (f'Edit @photo, a real candid phone photo: {instruction}. Keep everything else exactly the same: the same people, '
+            'faces, poses, clothes, framing, camera angle, light and colours. No text, no captions, no watermark.')
+    body = {'model': MODEL, 'promptText': text, 'ratio': PORTRAIT_RATIO if sid in PORTRAIT and MODEL == 'nano_banana_2.1' else RATIOS[MODEL],
+            'referenceImages': [{'uri': ref_uri(sid), 'tag': 'photo'}]}
+    tid = call('POST', '/text_to_image', body)['id']
+    remember(f'{sid}_edit', tid)
+    print(f'{sid}: edit task {tid}', flush=True)
+    url = wait(sid, tid)
+    log_spend(f'{sid}_edit', 6)
+    keep = os.path.join(OUT, 'v1')
+    os.makedirs(keep, exist_ok=True)
+    shutil.copy(os.path.join(OUT, f), os.path.join(keep, f))
+    return download(sid, url) + ' [edited]'
+
+
 def download(sid, url):
     host = urllib.parse.urlparse(url).netloc
     try:
@@ -190,6 +214,21 @@ def main():
             cap, args = int(args[1]), args[2:]
         else:
             raise SystemExit(f'unknown option {args[0]}')
+    if args and args[0] == '--edit':
+        # --edit edits.json: [{"id": "O4", "instruction": "remove the red plastic cups"}, ...]. The current photo is
+        # passed as @photo so the framing stays (traced masks keep working); the old file moves to media/stills/v1/.
+        edits = json.load(open(args[1]))
+        before = call('GET', '/organization')['creditBalance']
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futs = {pool.submit(edit, e['id'], e['instruction'], cap): e['id'] for e in edits}
+            for f, i in futs.items():
+                try:
+                    print(f.result(), flush=True)
+                except Exception as e:
+                    print(f'{i}: ERROR {e}', flush=True)
+        after = call('GET', '/organization')['creditBalance']
+        print(f'credits: {before} -> {after} (used {before - after}; logged total {spent()})')
+        return
     if args and args[0] == '--fetch':
         known = load(TASKS, {})
         for i in args[1:] or list(known):
