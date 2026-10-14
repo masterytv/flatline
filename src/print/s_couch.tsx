@@ -5,7 +5,7 @@ import {BEATS, beatsIn, bt, lastBeatIndex, pulse} from '../timing';
 import {Density, useDensities} from './density';
 import {hash2, INK, MONO, SERIF} from './ink';
 import {clamp01, CropMarks, easeIn, easeInOut, easeOut, ecg, FlatlineBar, inked, kickNudge, lerp, RegTarget, Rule, Slug, stamp} from './kit';
-import {bbox, FRIENDS, Friend, inPoly, P11_SPIN, P12_MAYA, P7_HAND, P7_LAMP, P7_PALM, P7_PEOPLE, P7_PHONES, P7_PULL, P8_LAMP, P9_GAP, Poly} from './masks';
+import {bbox, FRIENDS, Friend, inPoly, P11_SPIN, P12_MAYA, P7_FACES, P7_HAND, P7_LAMP, P7_PALM, P7_PEOPLE, P7_PHONES, P7_PULL, P8_LAMP, P9_GAP, Poly} from './masks';
 import {Cam, Plate, plateDots, Sheet, sheetMatrix} from './press';
 import {CamLayer, Paper, Press} from './Press';
 
@@ -245,18 +245,68 @@ const p7Map = (d: Density): Density => {
 	return m;
 };
 
+/**
+ * One face given back its features for its punch-in. The room curve (p7Map) flattens a pale, phone-lit face to almost
+ * bare paper, so a tight line screen prints it as even stripes. Inside an ellipse round P7_FACES[f] the cold channel is
+ * rebuilt from the raw plate as 1.25 (b - 0.12) + 0.6 k, which keeps the eyelids, the nose's shadow, the mouth and the
+ * jaw; it fades back to the room curve over the ellipse's edge (hair and collar print the same either way).
+ */
+const FACE_MAPS = new WeakMap<Density, Partial<Record<Friend, Density>>>();
+const p7FaceMap = (d: Density, f: Friend): Density => {
+	const per = FACE_MAPS.get(d) ?? {};
+	const hit = per[f];
+	if (hit) return hit;
+	const base = p7Map(d);
+	const data = new Uint8ClampedArray(base.data);
+	const fc = P7_FACES[f];
+	const ru = 0.6 * fc.w; // half-width in u: the face plus a margin to the ears
+	const rv = 0.8 * fc.w * A7; // half-height in v: brow line to chin
+	const x0 = Math.max(0, Math.floor((fc.u - 1.2 * ru) * (d.w - 1)));
+	const x1 = Math.min(d.w - 1, Math.ceil((fc.u + 1.2 * ru) * (d.w - 1)));
+	const y0 = Math.max(0, Math.floor((fc.v - 1.2 * rv) * (d.h - 1)));
+	const y1 = Math.min(d.h - 1, Math.ceil((fc.v + 1.2 * rv) * (d.h - 1)));
+	for (let y = y0; y <= y1; y++) {
+		for (let x = x0; x <= x1; x++) {
+			const e = Math.hypot((x / (d.w - 1) - fc.u) / ru, (y / (d.h - 1) - fc.v) / rv);
+			if (e >= 1.15) continue;
+			const a = clamp01((1.15 - e) / 0.3);
+			const k = a * a * (3 - 2 * a);
+			const i = (y * d.w + x) * 4;
+			const face = clamp01(1.25 * (d.data[i + 2] / 255 - 0.12) + (0.6 * d.data[i]) / 255);
+			data[i + 2] = Math.round(255 * ((base.data[i + 2] / 255) * (1 - k) + face * k));
+		}
+	}
+	const m: Density = {id: `${d.id}-face-${f}`, w: d.w, h: d.h, data};
+	FACE_MAPS.set(d, {...per, [f]: m});
+	return m;
+};
+
+/**
+ * Kai's punch-in gets its own cold screen: at 2.55x the room's cell 7 lines are 18 px apart, coarser than his downcast
+ * eyes and mouth. The punch-in is a hard cut both ways, so the finer screen (and his face curve) comes and goes unseen.
+ */
+const PUNCH_SCREEN: Partial<Record<Friend, number>> = {kai: 4.5};
+type Look = {face?: Friend; cold?: number};
+const punchLook = (t: number): Look => {
+	for (const f of FRIENDS) {
+		const cell = PUNCH_SCREEN[f];
+		if (cell && t >= PUNCH[f] && t < WARM[f]) return {face: f, cold: cell};
+	}
+	return {};
+};
+
 /** P7 at time t: the cold line screen where nobody has been warmed yet, heat and key dots where they have. */
-const p7Sheet = (map: Density, t: number, nudge = true): Sheet => {
+const p7Sheet = (map: Density, t: number, nudge = true, look: Look = {}): Sheet => {
 	const warm = warmth(t);
 	const glow = bloom(t);
 	const [hx, hy] = nudge ? kickNudge(t, 1, 2.2) : [0, 0];
 	const [kx, ky] = nudge ? kickNudge(t, 0, 1.2) : [0, 0];
 	return {
-		map: p7Map(map),
+		map: look.face ? p7FaceMap(map, look.face) : p7Map(map),
 		...P7S,
 		seed: 5,
 		plates: [
-			{ch: 2, ink: INK.cold, angle: 75, cell: 7, kind: 'line', mask: (u, v) => (warm(u, v) > 0 ? 0 : 1 - glow(u, v))},
+			{ch: 2, ink: INK.cold, angle: 75, cell: look.cold ?? 7, kind: 'line', mask: (u, v) => (warm(u, v) > 0 ? 0 : 1 - glow(u, v))},
 			{ch: 1, ink: INK.heat, angle: 15, cell: 7, dx: 2 + hx, dy: -1 + hy, mask: warm},
 			{ch: 0, ink: INK.key, angle: 45, cell: 7, gain: 0.88, dx: kx, dy: ky, mask: (u, v) => Math.min(warm(u, v), RIDGE)},
 		],
@@ -341,12 +391,17 @@ const onP7 = (u: number, v: number, s: number, rot = 0): Cam => {
 	return {cx, cy, s, rot};
 };
 
-// The punch-ins alternate a tight face (Jess looks at us, Kai lit from below) with face-and-phone (Dev, Sam).
-const PUNCH_CAM: Record<Friend, (k: number) => Cam> = {
-	jess: (k) => onP7(0.236, 0.38, 2.55 * (1 + 0.045 * k), 0),
-	dev: (k) => onP7(0.418, 0.555, 2.15 * (1 + 0.045 * k), -1.6),
-	kai: (k) => onP7(0.627, 0.44, 2.55 * (1 + 0.045 * k), 1.3),
-	sam: (k) => onP7(0.85, 0.54, 2.15 * (1 + 0.045 * k), -1.1),
+// The punch-ins alternate a tight face (Jess looks at us, Kai lit from below) with face-and-phone (Dev, Sam), each
+// framed from its traced face centre: (du, dv) moves the frame centre off the face (down to take in the phone).
+const PUNCH_FRAME: Record<Friend, {du: number; dv: number; s: number; rot: number}> = {
+	jess: {du: 0, dv: 0.015, s: 2.55, rot: 0},
+	dev: {du: -0.007, dv: 0.135, s: 2.15, rot: -1.6},
+	kai: {du: 0.002, dv: 0.015, s: 2.55, rot: 1.3},
+	sam: {du: 0.008, dv: 0.11, s: 2.15, rot: -1.1},
+};
+const PUNCH_CAM = (f: Friend, k: number): Cam => {
+	const p = PUNCH_FRAME[f];
+	return onP7(P7_FACES[f].u + p.du, P7_FACES[f].v + p.dv, p.s * (1 + 0.045 * k), p.rot);
 };
 // ...and each warm beat pulls back to show the warm friend next to the cold one still waiting.
 const BACK_CAM: Record<Friend, Cam> = {
@@ -364,7 +419,7 @@ const couchCam = (t: number): Cam => {
 		if (t >= WIDE) break;
 		// the warm beat cuts wider, settling as the stencil sweeps through them
 		if (t >= WARM[f]) return zoom(BACK_CAM[f], 1.06 - 0.06 * easeOut((t - WARM[f]) / 0.15) + 0.03 * clamp01((t - WARM[f]) / (NEXT[f] - WARM[f])));
-		if (t >= PUNCH[f]) return PUNCH_CAM[f]((t - PUNCH[f]) / (WARM[f] - PUNCH[f]));
+		if (t >= PUNCH[f]) return PUNCH_CAM(f, (t - PUNCH[f]) / (WARM[f] - PUNCH[f]));
 	}
 	if (t < BUCKLE) return {cx: 960, cy: 540, s: 1 + 0.03 * clamp01((t - WIDE) / (BUCKLE - WIDE)), rot: 0};
 	return {cx: 960, cy: 545, s: lerp(1.03, 0.94, easeOut((t - BUCKLE) / 0.3)), rot: 0};
@@ -386,7 +441,7 @@ const CouchScene: React.FC<{t: number; cam: Cam; map: Density}> = ({t, cam, map}
 			<CamLayer cam={cam}>
 				<Paper />
 			</CamLayer>
-			<Press cam={cam} sheets={[p7Sheet(map, t)]} draw={(ctx) => drawPhones(ctx, t, cam)} />
+			<Press cam={cam} sheets={[p7Sheet(map, t, true, punchLook(t))]} draw={(ctx) => drawPhones(ctx, t, cam)} />
 			<CamLayer cam={cam}>
 				<CropMarks x={sx} y={sy} w={P7S.w} h={P7S.h} />
 				<RegTarget x={sx - 40} y={P7S.cy - 200} color={INK.cold} />
@@ -545,6 +600,11 @@ const MATCH = (() => {
 	return camAt(onSheet({...FULL, cx: S8.cx, cy: S8.cy, rot: S8.rot}, P8_LAMP.u, P8_LAMP.v), [x, y], s, -S8.rot);
 })();
 
+// 67.2: a true macro, her face about half the frame high. P12 is shot from above, so at the P9 macro's 2.6x her face
+// was a tenth of the frame; it gets a finer screen (5.2 x 4 = 21 px dots) and plates toned to print her pale skin.
+const MAYA_ZOOM = 4;
+const MAYA_CELL = 5.2;
+
 const PILE_CAM: Cam = {cx: 965, cy: 545, s: 0.46, rot: 0};
 const WHIP_DIST = 3900; // world px: the pile's trailing edge leaves the frame on the downbeat
 const WHIP_POW = 4.5;
@@ -560,9 +620,9 @@ const joinCam = (t: number): Cam => {
 	if (t < J.reg) return frameShot(S10, 1 + 0.025 * k(J.p10, J.reg));
 	if (t < J.p11) return frameShot(S10, 1.05 + 0.03 * k(J.reg, J.p11));
 	if (t < J.burst) return frameShot(S11, 1 + 0.025 * k(J.p11, J.burst));
-	if (t < J.p12) return frameShot(S11, lerp(1, 0.9, easeOut(k(J.burst, J.p12))));
+	if (t < J.p12) return frameShot(S11, lerp(1, 0.93, easeOut(k(J.burst, J.p12))));
 	if (t < J.maya) return frameShot(S12, 1 + 0.025 * k(J.p12, J.maya));
-	if (t < J.pile) return macroCam(S12, P12_MAYA, 2.6 * (1 + 0.07 * k(J.maya, J.pile)), -2.5);
+	if (t < J.pile) return macroCam(S12, P12_MAYA, MAYA_ZOOM * (1 + 0.07 * k(J.maya, J.pile)), -2.5);
 	// 67.3 cuts out of the macro to the whole of P12, which pulls back as the pile fans out under it
 	if (t < J.whip) return lerpCam(frameShot(S12, 0.94), zoom(PILE_CAM, 1 + 0.03 * k(J.pile, J.whip)), easeOut((t - J.pile) / 0.3));
 	const w = k(J.whip, J.end);
@@ -586,6 +646,12 @@ const plates = (s: Shot, t: number): Plate[] => {
 	}
 	// 66.4: P11 goes to the spin burst (drawn on its own)
 	if (s.id === 'P11' && t >= J.burst && t < J.p12) return [];
+	// 67.2: Maya's lamp-lit face is the palest thing in P12; lift its mids so brows, eyes and smile print
+	if (s.id === 'P12' && t >= J.maya && t < J.pile)
+		return [
+			{...heat, cell: MAYA_CELL, gain: 1.35, gamma: 0.55},
+			{...key, cell: MAYA_CELL, gain: 1, gamma: 0.7},
+		];
 	return [heat, key];
 };
 
@@ -659,12 +725,48 @@ const SheetPaper: React.FC<{pose: Pose; lift: number}> = ({pose, lift}) => (
 	</div>
 );
 
-/** The edge code in the print's bottom-left corner, on a strip of bare paper (printed after the image). */
+/** Each print's edge code, and the one it carries on its variation beat (when the code is the point). */
+const CODES: {id: JId; t0: number; t1: number; code: string}[] = [
+	{id: 'P8', t0: J.key, t1: J.p9, code: 'P8 · 65.2 · K 45° ONLY'},
+	{id: 'P9', t0: J.gap, t1: J.p10, code: 'P9 · 65.4 · MACRO 2.6×'},
+	{id: 'P10', t0: J.reg, t1: J.p11, code: 'P10 · 66.2 · OFF REGISTER'},
+	{id: 'P11', t0: J.burst, t1: J.p12, code: 'P11 · 66.4 · DOT BURST · 13'},
+	{id: 'P12', t0: J.maya, t1: J.pile, code: `P12 · 67.2 · MACRO ${MAYA_ZOOM}×`},
+];
+const codeOf = (s: Shot, t: number) => CODES.find((c) => c.id === s.id && t >= c.t0 && t < c.t1)?.code ?? s.code;
+
+const CHIP_FONT = 17;
+const chipStyle: React.CSSProperties = {position: 'absolute', left: 0, bottom: 0, padding: '4px 10px 3px', background: INK.paper, fontFamily: MONO, fontSize: CHIP_FONT, lineHeight: 1.2, letterSpacing: '0.12em', color: INK.key, whiteSpace: 'nowrap'};
+
+/** The edge code in the print's bottom-left corner, on a strip of bare paper (printed after the image): on the pile. */
 const SheetCode: React.FC<{pose: Pose; code: string}> = ({pose, code}) => (
 	<div style={{position: 'absolute', left: pose.cx - pose.w / 2, top: pose.cy - pose.h / 2, width: pose.w, height: pose.h, transform: `rotate(${pose.rot ?? 0}deg) scale(${pose.s ?? 1})`}}>
-		<div style={{position: 'absolute', left: 40, bottom: 34, padding: '4px 10px 3px', background: INK.paper, fontFamily: MONO, fontSize: 17, letterSpacing: '0.12em', color: INK.key, whiteSpace: 'nowrap'}}>{code}</div>
+		<div style={{...chipStyle, left: 40, bottom: 34}}>{code}</div>
 	</div>
 );
+
+/**
+ * The top print's edge code as the viewer sees it: at the print's bottom-left corner and turned with it, but never
+ * bigger than 1.1x and always whole inside a 40 px safe area, whatever the camera's punch (on the macros it sits in
+ * the frame's corner).
+ */
+const SAFE = 40;
+const ScreenCode: React.FC<{pose: Pose; cam: Cam; code: string}> = ({pose, cam, code}) => {
+	const m = sheetMatrix(pose, cam, W, H);
+	const sc = Math.min(1.1, Math.max(0.5, Math.hypot(m[0], m[1])));
+	const px = 40;
+	const py = pose.h - 34;
+	const w = (code.length * 0.72 * CHIP_FONT + 22) * sc;
+	const h = (CHIP_FONT * 1.2 + 7) * sc;
+	const x = Math.min(Math.max(m[0] * px + m[2] * py + m[4], SAFE), W - SAFE - w);
+	const y = Math.max(Math.min(m[1] * px + m[3] * py + m[5], H - SAFE), SAFE + h);
+	const rot = (Math.atan2(m[1], m[0]) * 180) / Math.PI;
+	return (
+		<div style={{position: 'absolute', left: x, top: y, transformOrigin: '0 0', transform: `rotate(${rot}deg) scale(${sc})`}}>
+			<div style={chipStyle}>{code}</div>
+		</div>
+	);
+};
 
 export const Join: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P8', 'P9', 'P10', 'P11', 'P12']);
@@ -702,20 +804,28 @@ export const Join: React.FC<{t: number}> = ({t}) => {
 				{shown.map((s) => {
 					const pose = poseOf(s, t);
 					const lift = 1 - easeOut((t - s.t0) / ENTRY);
-					const flood = s.id === 'P8' && t >= J.key && t < J.p9;
+					// 66.4: the burst flies on an unbounded field, so P11's own paper and shadow go while it is on
+					const burst = s.id === 'P11' && t >= J.burst && t < J.p12;
 					return (
 						<React.Fragment key={s.id}>
-							<CamLayer cam={cam}>
-								<SheetPaper pose={pose} lift={lift} />
-							</CamLayer>
+							{!burst && (
+								<CamLayer cam={cam}>
+									<SheetPaper pose={pose} lift={lift} />
+								</CamLayer>
+							)}
 							<Press cam={cam} sheets={[{map: d[s.id], ...pose, seed: s.seed, plates: plates(s, t)}]} />
-							<CamLayer cam={cam}>
-								<SheetCode pose={pose} code={flood ? 'P8 · 65.2 · K 45° ONLY' : s.id === 'P10' && t >= J.reg && t < J.p11 ? 'P10 · 66.2 · OFF REGISTER' : s.code} />
-							</CamLayer>
+							{pile ? (
+								<CamLayer cam={cam}>
+									<SheetCode pose={pose} code={s.code} />
+								</CamLayer>
+							) : (
+								s === SHOTS[top] && !burst && <ScreenCode pose={pose} cam={cam} code={codeOf(s, t)} />
+							)}
 						</React.Fragment>
 					);
 				})}
 				{t >= J.burst && t < J.p12 && <Press cam={cam} sheets={[]} draw={(ctx) => drawBurst(ctx, dots, t, cam)} />}
+				{t >= J.burst && t < J.p12 && <ScreenCode pose={poseOf(S11, t)} cam={cam} code={codeOf(S11, t)} />}
 			</AbsoluteFill>
 		</AbsoluteFill>
 	);

@@ -2,7 +2,7 @@ import React, {useId} from 'react';
 import {AbsoluteFill} from 'remotion';
 import {F} from '../full/cues';
 import {BEATS, bt, lastBeatIndex} from '../timing';
-import {Density, useDensities} from './density';
+import {Density, sample, useDensities} from './density';
 import {CAP, NO_LINES, O_COUNTER, O_ORIGIN, UPM} from './glyphs_groove';
 import {ANTON, hash2, INK, MONO, SERIF} from './ink';
 import {clamp01, CropMarks, easeIn, easeInOut, easeOut, inked, lerp, RegTarget, Rule, Slug, stamp, Tape} from './kit';
@@ -123,11 +123,13 @@ const P18_LANTERN: [number, number] = [0.495, 0.43];
 const P18_GAIN = 1.1;
 const P18_GAMMA = 4.5;
 const P18_CELL = 30;
-/** P18 seen through the counter: the lantern rides with the window, so it is the lantern we dive into. */
+/** P18 seen through the counter: the lantern rides with the window, so it is the lantern we dive into. At 1.2 the
+ * sheet still covers the frame with the lantern (v 0.43) on the centre: no paper band along the top. */
+const P18_THROUGH_S = 1.2;
 const p18Through = (win: [number, number]) => {
-	const lx = FULL.cx + (P18_LANTERN[0] - 0.5) * FULL.w * 1.08;
-	const ly = FULL.cy + (P18_LANTERN[1] - 0.5) * FULL.h * 1.08;
-	return {...FULL, cx: FULL.cx + (win[0] - lx), cy: FULL.cy + (win[1] - ly), s: 1.08};
+	const lx = FULL.cx + (P18_LANTERN[0] - 0.5) * FULL.w * P18_THROUGH_S;
+	const ly = FULL.cy + (P18_LANTERN[1] - 0.5) * FULL.h * P18_THROUGH_S;
+	return {...FULL, cx: FULL.cx + (win[0] - lx), cy: FULL.cy + (win[1] - ly), s: P18_THROUGH_S};
 };
 const p18Plate = (mask?: (u: number, v: number) => number): Plate => ({ch: 1, ink: INK.heat, angle: 15, cell: P18_CELL, gain: P18_GAIN, gamma: P18_GAMMA, mask});
 
@@ -284,13 +286,14 @@ const Words: React.FC<{t: number; cam: Cam}> = ({t, cam}) => {
 
 const P13Shot: React.FC<{t: number; map: Density}> = ({t, map}) => {
 	const id = `groove-whip-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
-	// the Join whip (s_couch) leaves to the right: P13 arrives still travelling right and brakes in five frames
+	// the Join whip (s_couch) leaves to the right: P13 arrives still travelling right and brakes in three frames; the
+	// blur is capped so the lit doorway and the group already read on the downbeat frame
 	const dt = t - F.groove;
 	const D = 330;
-	const tau = 0.05;
+	const tau = 0.03;
 	const x = -D * Math.exp(-dt / tau);
 	const v = ((D / tau) * Math.exp(-dt / tau)) / 30;
-	const blur = Math.min(110, v * 0.5);
+	const blur = Math.min(36, v * 0.3);
 	const cut = t >= P13_CUT;
 	const s = (1 + 0.3 * Math.exp(-dt / tau)) * (cut ? punch(t, P13_CUT, 0.05) : 1);
 	const crop: Crop = cut ? cropAt(0.53, 0.5, 1.75) : [0, 0, 1, 1];
@@ -376,15 +379,26 @@ const GROW = bt(71, 4); // 134.014 'I'm not the same': P19 prints back
 const KEY19 = bt(72); // 134.478 its key plate lands
 const A16 = 16 / 9;
 
-/** The light: ink lifts off P18 in a disc that grows from the lantern to past the corners. */
-const lightMask = (t: number) => {
-	const i = lastBeatIndex(t);
-	const breathe = 0.05 * Math.exp(-(t - BEATS[i].t) / 0.12);
-	const R = t < BRIGHT ? 0.2 + breathe : lerp(0.2, 1.3, easeIn((t - BRIGHT) / (WHITE - BRIGHT)) ** 0.75);
+/** The hand reaching into the lantern: P18's densest heat (0.84-0.97 against 0.72 sky) under the lantern. */
+const p18Hand = (map: Density) => (u: number, v: number) => {
+	if (u < 0.36 || u > 0.64 || v < 0.48) return 0;
+	return clamp01((sample(map, 1, u, v) - 0.79) / 0.05);
+};
+
+/** The light. Until 'so bright' the print is whole (the lantern is already bare paper, the hand a silhouette in it);
+ * on 'so bright' ink lifts off in a disc that grows from the lantern to past the corners, and the hand, the last
+ * thing standing, dissolves into the light as the sheet goes white. */
+const lightMask = (t: number, map: Density) => {
+	if (t < BRIGHT) return undefined;
+	const x = clamp01((t - BRIGHT) / (WHITE - BRIGHT));
+	const R = lerp(-0.15, 1.3, Math.pow(x, 1.2)); // at -0.15 the edge of the lift sits inside the bare lantern
 	const f = 0.42;
+	const keep = 1 - easeIn(clamp01((x - 0.3) / 0.7));
+	const hand = p18Hand(map);
 	return (u: number, v: number) => {
 		const dd = Math.hypot((u - P18_LANTERN[0]) * A16, v - P18_LANTERN[1]);
-		return clamp01((dd - R) / f);
+		const lit = clamp01((dd - R) / f);
+		return lit >= 1 || keep <= 0 ? lit : Math.max(lit, hand(u, v) * keep);
 	};
 };
 
@@ -424,7 +438,7 @@ export const Light: React.FC<{t: number}> = ({t}) => {
 			cy: lerp(from.cy, FULL.cy, e),
 			s: lerp(from.s, 1, e) * push,
 			seed: 18,
-			plates: [p18Plate(lightMask(t))],
+			plates: [p18Plate(lightMask(t, d.P18))],
 		};
 		return (
 			<AbsoluteFill style={{background: INK.paper}}>
@@ -491,6 +505,7 @@ const TAPE = bt(73); // 136.313 M1 taped into the name box
 const TOTAL = bt(73, 2); // 136.766 '4:00'
 const FOREVER = F.forever; // 137.218
 const MARCH = [bt(74), bt(74, 2)]; // 138.136, 138.588
+const CARD_EXIT = 8 / 30; // the card is off the frame eight frames after 'forever'
 
 const CARD = {w: 760, h: 980, cx: 960, cy: 548};
 const CARD_X = CARD.cx - CARD.w / 2;
@@ -599,29 +614,48 @@ const TimeCardFace: React.FC<{t: number; m1: Density}> = ({t, m1}) => {
 // The ∞: two round lobes joined by two straight strokes that cross at the centre (a bold geometric ∞), stroked
 // fat; it is a window onto P20. Each march is the same stamp stepping nearer, re-inked.
 const INF_C = 1.22; // lobe centre distance / lobe radius
-const INF_W = 0.56; // stroke / lobe radius
+const INF_W = 0.6; // stroke / lobe radius: the band runs 0.7r to 1.3r from each lobe centre
 const KEY20 = bt(73, 4); // 137.671: P20's key plate lands
 type Step = {t0: number; cx: number; cy: number; r: number};
 const STEPS: Step[] = [
-	{t0: FOREVER, cx: 960, cy: 540, r: 332},
-	{t0: MARCH[0], cx: 984, cy: 566, r: 420},
+	{t0: FOREVER, cx: 960, cy: 548, r: 332},
+	{t0: MARCH[0], cx: 984, cy: 590, r: 420},
 	{t0: MARCH[1], cx: 960, cy: 668, r: 520},
 ];
-/** P20 behind the ∞ so Jess's face sits on the left lobe's top arc and Sam's on the right one's. */
+// Traced on P20 (scratchpad build/groove/P20_face_L.jpg, P20_face_R.jpg): face centres, forehead to chin v 0.27-0.46.
+const JESS: [number, number] = [0.28, 0.372];
+const SAM: [number, number] = [0.735, 0.375];
+const FACE_U = (JESS[0] + SAM[0]) / 2;
+const FACE_V = (JESS[1] + SAM[1]) / 2;
+const FACE_SEP = SAM[0] - JESS[0];
+/** P20 behind the ∞ (world px) with Jess's face on the centre line of the left lobe's top arc and Sam's on the right
+ * one's, as big as it takes for the photo to cover every part of the window on the frame. When the photo has to be
+ * bigger than the lobes are apart, the faces slide out and down along the arcs, so they stay on the band. */
 const p20For = (cx: number, cy: number, r: number) => {
-	const faceY = cy - r * 0.9;
-	const half = (INF_W * r) / 2 + 14;
-	// big enough that the faces reach the arcs and that no part of the window on screen runs off the photo
-	const s = Math.max(
-		1,
-		(2 * INF_C * r) / (0.455 * FULL.w),
-		(Math.min(H, cy + r + half) - faceY) / (0.67 * FULL.h),
-		(faceY - Math.max(0, cy - r - half)) / (0.33 * FULL.h),
-		(2 * Math.min(W / 2 + Math.abs(cx - W / 2), (INF_C + 1) * r + half)) / FULL.w,
-	);
-	return {cx: cx + 0.0025 * FULL.w * s, cy: faceY + 0.17 * FULL.h * s, s};
+	const m = 18;
+	const out = r * (1 + INF_W / 2);
+	const lobe = INF_C * r;
+	const top = Math.max(0, cy - out) - m;
+	const bottom = Math.min(H, cy + out) + m;
+	const left = Math.max(0, cx - lobe - out) - m;
+	const right = Math.min(W, cx + lobe + out) + m;
+	let s = (2 * lobe) / (FACE_SEP * FULL.w);
+	let faceY = cy - r;
+	for (let it = 0; it < 6; it++) {
+		const dx = Math.max(0, (FACE_SEP * FULL.w * s) / 2 - lobe);
+		faceY = cy - Math.sqrt(Math.max(0, r * r - dx * dx));
+		s = Math.max(
+			(2 * lobe) / (FACE_SEP * FULL.w),
+			(bottom - faceY) / ((1 - FACE_V) * FULL.h),
+			(faceY - top) / (FACE_V * FULL.h),
+			(cx - left) / (FACE_U * FULL.w),
+			(right - cx) / ((1 - FACE_U) * FULL.w),
+		);
+	}
+	return {cx: cx - (FACE_U - 0.5) * FULL.w * s, cy: faceY - (FACE_V - 0.5) * FULL.h * s, s};
 };
-const infPath = (cx: number, cy: number, r: number) => {
+/** The ∞'s centre line in world px: two straight strokes crossing at the centre and two round lobes. */
+const infPts = (cx: number, cy: number, r: number): [number, number][] => {
 	const c = INF_C * r;
 	const th = Math.asin(1 / INF_C);
 	const t1: [number, number] = [c * Math.cos(th) ** 2, -c * Math.cos(th) * Math.sin(th)];
@@ -632,16 +666,18 @@ const infPath = (cx: number, cy: number, r: number) => {
 		right.push([c + r * Math.cos(a), r * Math.sin(a)]);
 	}
 	const pts: [number, number][] = [[0, 0], ...right, [0, 0], ...right.map(([x, y]) => [-x, y] as [number, number])];
-	return `M${pts.map(([x, y]) => `${(cx + x).toFixed(1)},${(cy + y).toFixed(1)}`).join(' L')} Z`;
+	return pts.map(([x, y]) => [cx + x, cy + y]);
 };
+const ptsPath = (pts: [number, number][]) => `M${pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' L')} Z`;
 const svgMask = (d: string, sw: number) =>
 	`url("data:image/svg+xml;utf8,${encodeURIComponent(
-		`<svg xmlns='http://www.w3.org/2000/svg' width='${W}' height='${H}' viewBox='0 0 ${W} ${H}'><path d='${d}' fill='none' stroke='white' stroke-width='${sw}' stroke-linejoin='round' stroke-linecap='round'/></svg>`,
+		`<svg xmlns='http://www.w3.org/2000/svg' width='${W}' height='${H}' viewBox='0 0 ${W} ${H}'><path d='${d}' fill='none' stroke='white' stroke-width='${sw.toFixed(1)}' stroke-linejoin='round' stroke-linecap='round'/></svg>`,
 	)}")`;
 
 /** Where the stamp is: it steps from one impression to the next in three frames, landing with a stamp's overshoot. */
+const stepIndex = (t: number) => STEPS.filter((m) => t >= m.t0).length - 1;
 const stepAt = (t: number) => {
-	const n = STEPS.filter((m) => t >= m.t0).length - 1;
+	const n = stepIndex(t);
 	const cur = STEPS[n];
 	const prev = STEPS[Math.max(0, n - 1)];
 	const k = n === 0 ? 1 : easeOutBack((t - cur.t0) / (3 / 30));
@@ -649,57 +685,86 @@ const stepAt = (t: number) => {
 	return {cx: lerp(prev.cx, cur.cx, k), cy: lerp(prev.cy, cur.cy, k), r: lerp(prev.r, cur.r, k) * (n === 0 ? sc : 1 + (sc - 1) * 0.5)};
 };
 
+/** The off-beat: the stamp is re-inked half way between beats (a register kick that settles in a few frames). */
+const offKick = (t: number) => {
+	const i = lastBeatIndex(t);
+	if (i < 0 || i + 1 >= BEATS.length) return {k: 0, i};
+	const off = (BEATS[i].t + BEATS[i + 1].t) / 2;
+	return {k: t >= off ? Math.exp(-(t - off) / 0.07) : 0, i};
+};
+
+/** The rostrum over the ∞: the beat hit on every beat, a small re-ink punch on the off-beat, and a 1.5% creep
+ * through each hold, so no step sits still. */
+const infCam = (t: number): Cam => {
+	const n = stepIndex(t);
+	const t0 = STEPS[n].t0;
+	const t1 = n + 1 < STEPS.length ? STEPS[n + 1].t0 : F.together;
+	const creep = 1 + 0.015 * easeInOut((t - t0) / (t1 - t0));
+	const {k} = offKick(t);
+	return beatHit({cx: 960, cy: 540, s: creep * (1 + 0.008 * k), rot: 0}, t, 1);
+};
+
 const COUNTER_WORDS = [
 	{t0: MARCH[0], text: 'free', side: -1, ink: INK.key, size: 0.62},
 	{t0: MARCH[1], text: 'forever', side: 1, ink: INK.heat, size: 0.5},
 ];
 
-const Infinity8: React.FC<{t: number; map: Density}> = ({t, map}) => {
+const camG = (cam: Cam) => `translate(${W / 2} ${H / 2}) rotate(${cam.rot ?? 0}) scale(${cam.s}) translate(${-cam.cx} ${-cam.cy})`;
+
+const Infinity8: React.FC<{t: number; map: Density; cam: Cam}> = ({t, map, cam}) => {
 	const {cx, cy, r} = stepAt(t);
-	const d = infPath(cx, cy, r);
+	const pts = infPts(cx, cy, r);
 	const sw = INF_W * r;
-	const mask = svgMask(d, sw);
+	const mask = svgMask(ptsPath(pts.map((q) => toScreen(cam, q))), sw * cam.s);
 	const p = p20For(cx, cy, r);
 	const keyOn = t >= KEY20;
 	const kd = keyOn ? 12 * (1 - easeOut((t - KEY20) / (4 / 30))) : 0;
-	const plates: Plate[] = [{ch: 1, ink: INK.heat, angle: 15, cell: 8, dx: 2, dy: -1}];
-	if (keyOn) plates.push({ch: 0, ink: INK.key, angle: 45, cell: 8, gain: 0.9, dx: kd, dy: -kd * 0.5});
+	// the off-beat re-ink: the heat plate kicks a few px out of register and settles
+	const {k: ko, i: bi} = offKick(t);
+	const hx = (hash2(bi, 2, 37) - 0.5) * 12 * ko;
+	const hy = (hash2(bi, 4, 37) - 0.5) * 8 * ko;
+	const plates: Plate[] = [{ch: 1, ink: INK.heat, angle: 15, cell: 8, dx: 2 + hx, dy: -1 + hy}];
+	if (keyOn) plates.push({ch: 0, ink: INK.key, angle: 45, cell: 8, gain: 0.8, dx: kd, dy: -kd * 0.5});
 	return (
 		<>
 			<svg viewBox={`0 0 ${W} ${H}`} style={{...svgFull, mixBlendMode: 'multiply', ...inked(900, 13, 5, true)}}>
-				<path d={d} fill="none" stroke={INK.heat} strokeWidth={sw + 24} strokeLinejoin="round" strokeLinecap="round" />
+				<g transform={camG(cam)}>
+					<path d={ptsPath(pts)} fill="none" stroke={INK.heat} strokeWidth={sw + 24 + 10 * ko} strokeLinejoin="round" strokeLinecap="round" />
+				</g>
 			</svg>
 			<div style={{position: 'absolute', inset: 0, WebkitMaskImage: mask, maskImage: mask, WebkitMaskSize: `${W}px ${H}px`, maskSize: `${W}px ${H}px`, WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat'}}>
 				<PaperFill />
-				<Press sheets={[{map, ...FULL, ...p, seed: 20, plates}]} />
+				<Press cam={cam} sheets={[{map, ...FULL, ...p, seed: 20, plates}]} />
 			</div>
 			{/* the lyric fills the counters as the stamp marches: 'free' on 74.1, 'forever' on 74.2 */}
-			{COUNTER_WORDS.filter((w) => t >= w.t0).map((w) => {
-				const rho = r * (1 - INF_W / 2);
-				const st = stamp(t, w.t0);
-				return (
-					<div
-						key={w.text}
-						style={{
-							position: 'absolute',
-							left: cx + w.side * INF_C * r - rho,
-							top: cy - rho * 0.62,
-							width: 2 * rho,
-							textAlign: 'center',
-							fontFamily: SERIF,
-							fontStyle: 'italic',
-							fontSize: rho * w.size,
-							lineHeight: 1,
-							color: w.ink,
-							mixBlendMode: 'multiply',
-							transform: `scale(${st.s}) rotate(${w.side * -4}deg)`,
-							...inked(700, w.side * 90, 20),
-						}}
-					>
-						{w.text}
-					</div>
-				);
-			})}
+			<CamLayer cam={cam}>
+				{COUNTER_WORDS.filter((w) => t >= w.t0).map((w) => {
+					const rho = r * (1 - INF_W / 2);
+					const st = stamp(t, w.t0);
+					return (
+						<div
+							key={w.text}
+							style={{
+								position: 'absolute',
+								left: cx + w.side * INF_C * r - rho,
+								top: cy - rho * 0.62,
+								width: 2 * rho,
+								textAlign: 'center',
+								fontFamily: SERIF,
+								fontStyle: 'italic',
+								fontSize: rho * w.size,
+								lineHeight: 1,
+								color: w.ink,
+								mixBlendMode: 'multiply',
+								transform: `scale(${st.s}) rotate(${w.side * -4}deg)`,
+								...inked(700, w.side * 90, 20),
+							}}
+						>
+							{w.text}
+						</div>
+					);
+				})}
+			</CamLayer>
 		</>
 	);
 };
@@ -712,23 +777,23 @@ export const TimeCard: React.FC<{t: number}> = ({t}) => {
 	const cut = [OUT, GONE, IN, TAPE, TOTAL].filter((c) => t >= c).pop() ?? OUT;
 	const c0 = cardCam(t);
 	const drift = 1 + 0.012 * clamp01((t - cut) / 0.9);
-	const cam = beatHit({...c0, s: c0.s * punch(t, cut, 0.035, 0.2) * drift}, t, 0.8);
-	const tip = easeInOut((t - FOREVER) / 0.5);
+	// from 'forever' the page is under the ∞'s rostrum
+	const cam = t >= FOREVER ? infCam(t) : beatHit({...c0, s: c0.s * punch(t, cut, 0.035, 0.2) * drift}, t, 0.8);
+	// on 'forever' the card tips back and drops off the bottom of the frame in eight frames, so the ∞ reads alone
+	const tip = easeOut((t - FOREVER) / (4 / 30));
+	const drop = easeIn((t - FOREVER) / CARD_EXIT);
+	const cardGone = t >= FOREVER + CARD_EXIT;
+	// 'gone' (and its arrow) only on the wide shots: a cut-in would crop it to debris
+	const wide = (t >= GONE && t < IN) || (t >= TOTAL && t < FOREVER);
 	return (
 		<AbsoluteFill style={{background: INK.paper}}>
 			<CamLayer cam={cam}>
 				<Paper />
 				{/* the lyric, in the human voice, beside the card */}
-				{t >= GONE && t < FOREVER && (
+				{wide && (
 					<div style={{position: 'absolute', left: 168, top: 572, fontFamily: SERIF, fontStyle: 'italic', fontSize: 150, lineHeight: 1, color: INK.heat, transform: `rotate(-7deg) scale(${stamp(t, GONE).s})`, mixBlendMode: 'multiply'}}>
 						gone
 					</div>
-				)}
-				{t >= GONE && t < FOREVER && (
-					<svg style={{position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', mixBlendMode: 'multiply'}}>
-						<path d={`M 470 718 C 520 690, 560 676, ${CARD_X + 30} 660`} fill="none" stroke={INK.heat} strokeWidth={6} strokeLinecap="round" strokeDasharray="420" strokeDashoffset={420 * (1 - easeOut((t - GONE) / 0.18))} />
-						<path d={`M ${CARD_X + 6} 642 L ${CARD_X + 34} 660 L ${CARD_X + 8} 682`} fill="none" stroke={INK.heat} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" opacity={t >= GONE + 0.15 ? 1 : 0} />
-					</svg>
 				)}
 				{t >= TOTAL && t < FOREVER && (
 					<div style={{position: 'absolute', left: CARD_X + CARD.w + 50, top: 820, fontFamily: SERIF, fontStyle: 'italic', fontSize: 112, lineHeight: 0.95, color: INK.heat, transform: `rotate(-5deg) scale(${stamp(t, TOTAL).s})`, transformOrigin: '0 50%', mixBlendMode: 'multiply'}}>
@@ -737,23 +802,30 @@ export const TimeCard: React.FC<{t: number}> = ({t}) => {
 						minutes
 					</div>
 				)}
-				{/* the card tips back on 'forever' and is gone when the stamp first marches */}
-				<div style={{position: 'absolute', left: CARD_X, top: CARD_Y, width: CARD.w, height: CARD.h, perspective: 1500, perspectiveOrigin: '50% 30%', display: t < MARCH[0] ? 'block' : 'none'}}>
+				{/* the card tips back on 'forever' and drops away under the stamp */}
+				<div style={{position: 'absolute', left: CARD_X, top: CARD_Y, width: CARD.w, height: CARD.h, perspective: 1500, perspectiveOrigin: '50% 30%', display: cardGone ? 'none' : 'block'}}>
 					<div
 						style={{
 							position: 'absolute',
 							inset: 0,
 							transformOrigin: '50% 100%',
-							transform: `translateY(${110 * tip}px) rotateX(${58 * tip}deg) rotate(${-1.5 + spin + 4 * tip}deg) scale(${slap})`,
+							transform: `translateY(${1250 * drop}px) rotateX(${62 * tip}deg) rotate(${-1.5 + spin + 6 * drop}deg) scale(${slap})`,
 							boxShadow: `0 ${18 - 10 * tip}px ${40 - 20 * tip}px rgba(50,32,15,0.28)`,
 						}}
 					>
 						<TimeCardFace t={t} m1={d.M1} />
 					</div>
 				</div>
-				<Slug x={CARD_X} y={CARD_Y + CARD.h + 14} text="GONE 4 MIN · FREE ∞ · PUNCH CLOCK 1:47" size={13} />
+				{/* the arrow lands on the card, pointing at OUT */}
+				{wide && (
+					<svg style={{position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', mixBlendMode: 'multiply'}}>
+						<path d={`M 470 718 C 520 690, 560 676, ${CARD_X + 30} 660`} fill="none" stroke={INK.heat} strokeWidth={6} strokeLinecap="round" strokeDasharray="420" strokeDashoffset={420 * (1 - easeOut((t - GONE) / 0.18))} />
+						<path d={`M ${CARD_X + 6} 642 L ${CARD_X + 34} 660 L ${CARD_X + 8} 682`} fill="none" stroke={INK.heat} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" opacity={t >= GONE + 0.15 ? 1 : 0} />
+					</svg>
+				)}
+				{!cardGone && <Slug x={CARD_X} y={CARD_Y + CARD.h + 14} text="GONE 4 MIN · FREE ∞ · PUNCH CLOCK 1:47" size={13} />}
 			</CamLayer>
-			{t >= FOREVER && <Infinity8 t={t} map={d.P20} />}
+			{t >= FOREVER && <Infinity8 t={t} map={d.P20} cam={cam} />}
 		</AbsoluteFill>
 	);
 };
@@ -783,32 +855,36 @@ const stripY = (k: number, t: number) => {
 		const prev = j === 0 ? 0 : -now;
 		return lerp(prev, now, easeOutBack(x));
 	}
-	// in phase: every beat they hop together; on 'together' they snap from where they were into line
-	const hopX = (t - bt0) / 0.3;
-	const hop = hopX < 1 ? -JOLT * 1.1 * Math.sin(Math.PI * Math.min(1, hopX)) * (1 - 0.3 * hopX) : 0;
-	if (t < TOGETHER + 0.12) {
+	// on 'together' they snap from where they were into line and stay there for the whole beat (no hop on it)
+	if (i <= lastBeatIndex(TOGETHER)) {
 		const from = side * JOLT; // the last out-of-phase beat (75.2) had odd strips up
 		return lerp(-from, 0, easeOutBack((t - TOGETHER) / 0.12));
 	}
-	return hop;
+	// in phase: on every later beat they hop together
+	const hopX = (t - bt0) / 0.3;
+	return hopX < 1 ? -JOLT * 1.1 * Math.sin(Math.PI * hopX) * (1 - 0.3 * hopX) : 0;
 };
 
 export const Strips: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P21', 'P22', 'P23', 'P24']);
 	if (!d) return <AbsoluteFill style={{background: INK.paper}} />;
-	// PROVISIONAL until P22 exists: Kai's strips fall back to P21 mirrored (a missing plate is a 2x2 empty map)
+	// Kai's strips are P22. If its plate is ever missing (a 2x2 empty map), they fall back to P21 slid two strips
+	// over (unmirrored), so Jess reads displaced rather than as a mirrored double
 	const p22Missing = d.P22.w <= 2;
-	const kai: {map: Density; flipX: boolean} = p22Missing ? {map: d.P21, flipX: true} : {map: d.P22, flipX: false};
-	const jess = {map: d.P21, flipX: false};
+	const kai = p22Missing ? {map: d.P21, du: 2 / SN} : {map: d.P22, du: 0};
+	const jess = {map: d.P21, du: 0};
 	const together = t >= TOGETHER;
 	const keyOnly = t >= KEYFLASH && t < bt(76, 2);
 	const scatter = t >= SCATTER;
 	const sw = SA.w / SN;
+	// once they are in line the seams close over the 'together' beat (the fourteen strips heal into one print), and
+	// open again when the scatter kicks them apart
+	const gap = together && !scatter ? lerp(GAP, 0, easeInOut((t - TOGETHER - 0.12) / 0.3)) : GAP;
 	const sheets: Sheet[] = [];
 	for (let k = 0; k < SN; k++) {
 		const odd = k % 2 === 1;
 		const swapped = t >= SWAP;
-		const src = together ? {map: d.P23, flipX: false} : odd !== swapped ? jess : kai;
+		const src = together ? {map: d.P23, du: 0} : odd !== swapped ? jess : kai;
 		let dy = stripY(k, t);
 		let rot = 0;
 		if (scatter) {
@@ -819,15 +895,13 @@ export const Strips: React.FC<{t: number}> = ({t}) => {
 			dy += (odd ? 1 : -1) * (70 * easeOut(x / 0.07) + e * 1250);
 			rot = (hash2(k, 3, 7) - 0.5) * 14 * e;
 		}
-		const x0 = k / SN;
-		const x1 = (k + 1) / SN;
-		const crop: Crop = src.flipX ? [1 - x1, 0, 1 - x0, 1] : [x0, 0, x1, 1];
+		const x0 = Math.min(1 - 1 / SN, k / SN + src.du);
+		const crop: Crop = [x0, 0, x0 + 1 / SN, 1];
 		const plates: Plate[] = keyOnly ? [{ch: 0, ink: INK.key, angle: 45, cell: 8, gain: 1.05}] : heatKey(8, {kgain: 0.88});
 		sheets.push({
 			map: src.map,
 			crop,
-			flipX: src.flipX,
-			w: sw - GAP,
+			w: sw - gap,
 			h: SA.h,
 			cx: SA.cx - SA.w / 2 + (k + 0.5) * sw,
 			cy: SA.cy + dy,

@@ -44,7 +44,10 @@ export const P7_PHONES: Record<Friend, Poly> = {
 /** Maya's hand, palm up with four silver rings, from the bottom-left corner (finger gaps notched in). */
 export const P7_HAND: Poly = [[0.13, 1.0], [0.144, 0.975], [0.152, 0.955], [0.164, 0.882], [0.172, 0.839], [0.18, 0.803], [0.186, 0.776], [0.196, 0.755], [0.205, 0.73], [0.214, 0.706], [0.224, 0.697], [0.233, 0.705], [0.237, 0.735], [0.233, 0.765], [0.224, 0.79], [0.222, 0.825], [0.24, 0.828], [0.26, 0.818], [0.28, 0.806], [0.3, 0.792], [0.32, 0.772], [0.333, 0.758], [0.342, 0.762], [0.34, 0.779], [0.31, 0.822], [0.296, 0.845], [0.32, 0.822], [0.35, 0.786], [0.37, 0.768], [0.38, 0.771], [0.379, 0.786], [0.36, 0.81], [0.32, 0.861], [0.35, 0.83], [0.376, 0.804], [0.39, 0.803], [0.392, 0.818], [0.376, 0.846], [0.33, 0.893], [0.36, 0.876], [0.38, 0.864], [0.396, 0.874], [0.392, 0.893], [0.376, 0.918], [0.36, 0.943], [0.35, 0.972], [0.348, 1.0]];
 
-/** Face centres (u, v) and the face width as a fraction of the photo width, for the punch-ins. */
+/**
+ * Face centres (u, v) and the face width as a fraction of the photo width. The punch-ins frame from these, and the
+ * cold plate's face curve (Kai's punch-in) is an ellipse round the centre, w wide. Checked on the cleaned P7 (2026-10-14).
+ */
 export const P7_FACES: Record<Friend, {u: number; v: number; w: number}> = {
 	jess: {u: 0.236, v: 0.365, w: 0.07},
 	dev: {u: 0.425, v: 0.42, w: 0.065},
@@ -71,11 +74,15 @@ export const P7_PALM = {u: 0.27, v: 0.88};
 /* ------------------------------------------------------------------------------------------------------------ */
 /* "They join her" (2:01.6), points read off P8-P12.                                                              */
 
-/** P8's lamp shade (same lamp as P7, shot from further back): P8 prints 1.37x larger to register on P7. */
+/**
+ * P8's lamp shade (same lamp as P7, shot from further back). On the page the shade is 98.6 paper px wide in P7 and
+ * 81.2 in a full-bleed P8, so P8 must print about 1.21x larger than P7's paper scale to register; with the couch
+ * pulled back to 0.94 at the cut, the match camera sits at about 1.14x.
+ */
 export const P8_LAMP = {u: 0.36, v: 0.462, w: 0.041};
 /** P9: the gap between Jess's and Maya's open mouths, singing the same word (the macro's centre). */
 export const P9_GAP = {u: 0.555, v: 0.385};
 /** P11: Sam's face, the centre of her spin (the dot burst flies out from here). */
 export const P11_SPIN = {u: 0.49, v: 0.33};
-/** P12: Maya's upturned face in the ring (the macro's centre). */
-export const P12_MAYA = {u: 0.627, v: 0.37};
+/** P12: Maya's upturned face in the ring, between her eyes and her smile (the macro's centre; eyes at v 0.345). */
+export const P12_MAYA = {u: 0.62, v: 0.36};

@@ -7,7 +7,7 @@ import {INK, MONO} from './ink';
 // their small type knocked out to bare paper. Each part is drawn round its own centre (0, 0) in three modes:
 //  sil  - white silhouette, for the flood's mask (the part as a window onto the print)
 //  body - the part itself, lime ink
-//  edge - a lime hairline round the silhouette (it stays on while the window is open)
+//  edge - a hairline round the silhouette: lime while the window is open, paper for the feed's ghost columns
 
 export type PartKind =
 	| 'card'
@@ -136,9 +136,9 @@ type Look = {
 	vectorEffect?: 'non-scaling-stroke';
 };
 
-/** Fill/stroke for a mode: the silhouette in its mask ink (swollen by `grow`), the edge a lime hairline, the body `body`. */
+/** Fill/stroke for a mode: the silhouette in its mask ink (swollen by `grow`), the edge a hairline, the body `body`. */
 const lookOf =
-	(sil: Sil, edgeW: number) =>
+	(sil: Sil, edgeW: number, edgeInk: string) =>
 	(mode: Mode, body: Look): Look =>
 		mode === 'sil'
 			? sil.grow > 0
@@ -152,7 +152,7 @@ const lookOf =
 			: mode === 'edge'
 				? {
 						fill: 'none',
-						stroke: LIME,
+						stroke: edgeInk,
 						strokeWidth: edgeW,
 						vectorEffect: 'non-scaling-stroke',
 					}
@@ -171,10 +171,12 @@ export const PartShape: React.FC<{
 	sil?: Sil;
 	/** the edge hairline's width in screen px */
 	edgeW?: number;
-}> = ({p, mode, s, sil = SIL, edgeW = 1.6}) => {
+	/** the edge hairline's ink (lime; paper for the feed's ghost columns) */
+	edgeInk?: string;
+}> = ({p, mode, s, sil = SIL, edgeW = 1.6, edgeInk = LIME}) => {
 	const {w, h} = p;
 	const body = mode === 'body';
-	const look = lookOf(sil, edgeW);
+	const look = lookOf(sil, edgeW, edgeInk);
 	switch (p.kind) {
 		case 'card':
 			// a notification banner: lime frame, the app icon, its type knocked out to paper
@@ -326,7 +328,7 @@ export const PartShape: React.FC<{
 			const r = h / 2 - 6;
 			const arc = `M0,${-r} A${r},${r} 0 1 1 ${-r},0`;
 			if (mode === 'sil') return <path d={arc} fill="none" stroke={sil.ink} strokeWidth={14 + sil.grow} strokeLinecap="round" />;
-			if (mode === 'edge') return <path d={arc} fill="none" stroke={LIME} strokeWidth={edgeW} vectorEffect="non-scaling-stroke" />;
+			if (mode === 'edge') return <path d={arc} fill="none" stroke={edgeInk} strokeWidth={edgeW} vectorEffect="non-scaling-stroke" />;
 			return (
 				<g transform={`rotate(${(s.t * 540) % 360})`}>
 					<circle r={r} fill="none" stroke={LIME} strokeOpacity={0.35} strokeWidth={10} />

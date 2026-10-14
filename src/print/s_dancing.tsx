@@ -1,11 +1,11 @@
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
 import {F} from '../full/cues';
-import {BEATS, beatsIn, bt, lastBeatIndex} from '../timing';
+import {BEATS, beatsIn, bt, lastBeatIndex, pulse} from '../timing';
 import {Density, useDensities} from './density';
 import {hash2, INK, MONO} from './ink';
 import {clamp01, easeIn, easeOut, ecg, FlatlineBar, inked, kickNudge, lerp, RegTarget, Slug, stamp} from './kit';
-import {inPoly, Poly} from './masks';
+import {bbox, FRIENDS, inPoly, P7_PHONES, Poly} from './masks';
 import {Cam, Plate, Sheet} from './press';
 import {CamLayer, Paper, PaperFill, Press} from './Press';
 
@@ -77,6 +77,23 @@ const ecgPoints = (t: number, w: number, amp: number, win: number, alive: (b: nu
 	return pts.join(' ');
 };
 
+/**
+ * A cold channel redrawn for a line screen carrying the whole picture alone, as s_couch's p7Map does for P7 (same
+ * formula, so the P7 seen through the FLATLINE letters is line for line the P7 the couch peels back to): the plate's
+ * cold density is straight inverse luminance and prints every face as a solid blob, so mids are pulled down and the
+ * key channel adds the darks back (0.55 b^1.4 + 0.6 k).
+ */
+const SCREEN_MAPS = new WeakMap<Density, Density>();
+export const screenMap = (d: Density): Density => {
+	const hit = SCREEN_MAPS.get(d);
+	if (hit) return hit;
+	const data = new Uint8ClampedArray(d.data);
+	for (let i = 0; i < data.length; i += 4) data[i + 2] = Math.min(255, (0.55 * Math.pow(data[i + 2] / 255, 1.4) + (0.6 * data[i]) / 255) * 255);
+	const m: Density = {id: `${d.id}-cold`, w: d.w, h: d.h, data};
+	SCREEN_MAPS.set(d, m);
+	return m;
+};
+
 const heatKey = (cell: number, hx = 0, hy = 0, kx = 0, ky = 0, mask?: (u: number, v: number) => number): Plate[] => [
 	{ch: 1, ink: INK.heat, angle: 15, cell, dx: 2 + hx, dy: -1 + hy, mask},
 	{ch: 0, ink: INK.key, angle: 45, cell, gain: 0.9, dx: kx, dy: ky, mask},
@@ -99,6 +116,7 @@ const DANCING_PATHS = [
 /** The real N-C gap: the N's right stem ends at x 888.8 and the C's straight back starts at 918.8 (y 334 to 731). */
 const NC_GAP = {x: 903.8, y: 532};
 const ZMAX = 100; // the gap (30 px) covers the frame at about 68x, two frames before 56.1
+const Z0 = 1.05; // 55.1 stamps the word up a step and the fly-through grows from there, so the move starts on the beat
 const RIM = 8; // a paper trap round every letter window, so a letter never drops into the flood where she is dark
 
 /** P2 on the table: the same sheet behind the letters, under the fly-through and at the bottom of the pile. */
@@ -106,7 +124,7 @@ const P2_SHEET = {w: 1880, h: 1049, cx: 960, cy: 540};
 
 const wordZoom = (t: number) => {
 	const x = clamp01((t - bt(55)) / (bt(56) - bt(55)));
-	return {x, z: Math.exp(Math.log(ZMAX) * Math.pow(x, 2.4))};
+	return {x, z: t < bt(55) ? 1 : Z0 * Math.exp(Math.log(ZMAX / Z0) * Math.pow(x, 2.4))};
 };
 
 export const DancingWord: React.FC<{t: number}> = ({t}) => {
@@ -115,17 +133,21 @@ export const DancingWord: React.FC<{t: number}> = ({t}) => {
 	const i = lastBeatIndex(t);
 	const since = t - BEATS[i].t;
 	const {x, z} = wordZoom(t);
-	// bar 54, every beat: 54.1 stamp, 54.2 pulse and shift, 54.3 heat 8 px off register, 54.4 back in register
-	const pulse = t < bt(55) ? Math.exp(-since / 0.1) : 0;
+	// bar 54, every beat: 54.1 stamp, 54.2 pulse and shift, 54.3 heat 8 px off register, 54.4 back in register.
+	// Bar 55 punches on every beat too, hardest on 55.1 where the fly-through starts.
+	const down55 = i >= 0 && Math.abs(BEATS[i].t - bt(55)) < 1e-6;
+	const punch = (t < bt(55) ? 0.035 : down55 ? 0.08 : 0.025) * Math.exp(-since / 0.1);
 	const shifted = t >= bt(54, 2) && t < bt(54, 4);
 	const shiftK = shifted ? easeOut((t - bt(54, 2)) / 0.1) : t >= bt(54, 4) ? 1 - easeOut((t - bt(54, 4)) / 0.1) : 0;
 	const off = t >= bt(54, 3) && t < bt(54, 4) ? 1 : 0;
-	// 55.3 kick nudge mid-zoom (and a small one on every beat)
-	const [kx, ky] = kickNudge(t, 0, t >= bt(55, 3) && t < bt(55, 4) ? 6 : 2);
-	const [hx, hy] = kickNudge(t, 1, t >= bt(55, 3) && t < bt(55, 4) ? 7 : 2);
-	const ps = 1 + 0.1 * easeIn(x); // the print behind pushes in a little: depth for the fly-through
+	// 55.1 and the 55.3 kick nudge the plates hard mid-zoom (and a small nudge on every beat)
+	const hard = down55 || (t >= bt(55, 3) && t < bt(55, 4));
+	const [kx, ky] = kickNudge(t, 0, hard ? 6 : 2);
+	const [hx, hy] = kickNudge(t, 1, hard ? 7 : 2);
+	// the print behind pushes in a little for depth: a 3% step on 55.1, then easing in to 1.1
+	const ps = t < bt(55) ? 1 : 1 + 0.1 * (0.3 + 0.7 * easeIn(x));
 	const cam: Cam = {cx: 960 + 16 * shiftK, cy: 540 - 8 * shiftK, s: ps};
-	const ws = z * slam.s * (1 + 0.035 * pulse * (1 - x));
+	const ws = z * slam.s * (1 + punch);
 	const jx = t >= bt(55, 3) && t < bt(55, 4) ? (hash2(i, 1, 9) - 0.5) * 22 * Math.exp(-since / 0.09) : 0;
 	const word = `translate(${NC_GAP.x + jx} ${NC_GAP.y}) scale(${ws}) translate(${-NC_GAP.x} ${-NC_GAP.y})`;
 	// the trap stays a thin paper line on screen as the word flies at us (scaled with the word it became 400 px cream bands)
@@ -232,7 +254,9 @@ const onPrint = (p: PrintDef, u: number, v: number): [number, number] => {
 /** Frame a print: it fills the frame with its edges just showing, the camera taking out most of its tilt. */
 const frameOn = (p: PrintDef, s = 1.05): Pose => ({cx: p.cx, cy: p.cy, s, rot: -0.65 * p.rot});
 
-const SOFA = onPrint(PR5, 0.445, 0.6);
+// The sofa punch-in keeps Maya's face (v 0.25-0.40) and all four friends with their phones (u 0.22-0.66, v 0.48-0.62)
+// in frame: at 1.6x the frame spans u 0.13-0.80, v 0.14-0.82 of P5.
+const SOFA = onPrint(PR5, 0.465, 0.48);
 const MOVES: Move[] = [
 	{t: -1e9, to: {cx: 960, cy: 540, s: 1.1, rot: 0}, dur: 1}, // where the fly-through leaves the print
 	{t: bt(56), to: frameOn(PR2, 1.035), dur: 0.3},
@@ -243,7 +267,7 @@ const MOVES: Move[] = [
 	{t: bt(58), to: frameOn(PR4), dur: 0.16},
 	{t: bt(58, 3), to: {cx: 945, cy: 580, s: 0.62, rot: 1.5}, dur: 0.3}, // pull back: the pile
 	{t: bt(59), to: frameOn(PR5), dur: 0.22},
-	{t: bt(59, 3), to: {cx: SOFA[0], cy: SOFA[1], s: 2.15, rot: -PR5.rot}, dur: 0.1}, // punch-in on the sofa
+	{t: bt(59, 3), to: {cx: SOFA[0], cy: SOFA[1], s: 1.6, rot: -PR5.rot}, dur: 0.1}, // punch-in on the sofa
 	{t: bt(60), to: frameOn(PR6), dur: 0.2},
 	{t: bt(60, 3), to: frameOn(PR6, 1.1), dur: 0.07},
 	{t: bt(60, 4), to: frameOn(PR6, 1.05), dur: 0.2},
@@ -274,8 +298,9 @@ const platesFor = (n: number, t: number): Plate[] => {
 		}
 		case 4: {
 			if (t < bt(59, 3)) return heatKey(8.5, hx, hy, kx, ky);
-			// the sofa punch-in: the friends on their phones go cold (line screen), Maya stays warm
-			const cold: Plate = {ch: 2, ink: INK.cold, angle: 75, cell: 5, kind: 'line', gain: 0.74, mask: (u, v) => 1 - mayaP5(u, v)};
+			// the sofa punch-in: the friends on their phones go cold (line screen on the redrawn cold channel, so the
+			// heads-down faces keep their darks and the phones stay paper), Maya stays warm
+			const cold: Plate = {ch: 2, ink: INK.cold, angle: 75, cell: 5, kind: 'line', mask: (u, v) => 1 - mayaP5(u, v)};
 			return [cold, ...heatKey(6, hx, hy, kx, ky, mayaP5)];
 		}
 		case 5: {
@@ -308,7 +333,8 @@ const Pile: React.FC<{t: number}> = ({t}) => {
 			const q = poseOf(p, t);
 			const r = (q.rot * Math.PI) / 180;
 			const off = ((FOOT - MARGIN) / 2) * q.s;
-			const map: Density = d[p.id];
+			// P5's cold plate prints from the redrawn cold channel (key and heat are the same in both maps)
+			const map: Density = p.id === 'P5' ? screenMap(d.P5) : d[p.id];
 			// the paper first (hides what is under it), then the image
 			sheets.push({map, w: p.w + 2 * MARGIN, h: p.h + MARGIN + FOOT, cx: q.cx - Math.sin(r) * off, cy: q.cy + Math.cos(r) * off, s: q.s, rot: q.rot, plates: [], ground: 'white', speckle: 0});
 			sheets.push({map, crop: p.crop, w: p.w, h: p.h, cx: q.cx, cy: q.cy, s: q.s, rot: q.rot, plates: platesFor(n, t), seed: 11 + n * 7});
@@ -356,79 +382,111 @@ export const FirstDance: React.FC<{t: number}> = ({t}) => <Pile t={t} />;
 
 /**
  * P7 as the couch stencils print it at 116.100: the same sheet in the same place, uncropped (2752:1536), on a still
- * camera. s_couch.tsx should import P7_SHEET and P7_COLD so the line screen it peels back to is the one seen through
- * the letters here, line for line.
+ * camera. s_couch.tsx prints P7 on this sheet (its P7S), from the same redrawn cold channel (screenMap here, p7Map
+ * there) with the same plate and seed, and knocks the same paper blooms round the phones out of it, so the line screen
+ * it peels back to is the one seen through the letters here, line for line.
  */
 export const P7_SHEET = {w: 1760, h: 982, cx: 960, cy: 520};
-/** The screen-world plate the couch starts from: ultramarine 75° line screen, cell 7 (seed 5 on the sheet). */
-export const P7_COLD: Plate = {ch: 2, ink: INK.cold, angle: 75, cell: 7, kind: 'line', gain: 0.82};
+/** The screen-world plate the couch starts from: ultramarine 75° line screen, cell 7, on screenMap(P7) (seed 5). */
+export const P7_COLD: Plate = {ch: 2, ink: INK.cold, angle: 75, cell: 7, kind: 'line'};
 export const P7_SEED = 5;
 
 // FLATLINE exactly as kit's FlatlineBar sets it here (Anton 430, letter-spacing 0.04 em, centred on x 960,
-// baseline 694.8), flattened from the font's outlines to polygons in frame px (checked against a render: within 2 px).
+// baseline 694.8), flattened from the font's outlines to polygons in frame px. Chrome kerns the A-T pair, which the
+// outlines did not, so F-L-A sit 2.6 px right and T-L-I-N-E 2.6 px left of the unkerned layout; with that, every edge
+// is within 0.3 px of a render.
+// The outers wind one way and the A's counter (index 3) the other, so one nonzero path holds all the windows.
 const FLAT_POLYS: number[][] = [
-	[217.2, 694.8, 217.2, 325.3, 365, 325.3, 365, 397.3, 291.6, 397.3, 291.6, 456.1, 361.3, 456.1, 361.3, 527.3, 291.6, 527.3, 291.6, 694.8],
-	[406, 694.8, 406, 325.3, 479.9, 325.3, 479.9, 631.8, 555.9, 631.8, 555.9, 694.8],
-	[584, 694.8, 619.7, 325.3, 745, 325.3, 780.1, 694.8, 710.2, 694.8, 704.9, 635.2, 660.4, 635.2, 655.8, 694.8],
-	[665.7, 576.2, 699.3, 576.2, 683.1, 388.3, 679.7, 388.3],
-	[851.7, 694.8, 851.7, 396.2, 807.8, 396.2, 807.8, 325.3, 969.5, 325.3, 969.5, 396.2, 925.6, 396.2, 925.6, 694.8],
-	[1007.2, 694.8, 1007.2, 325.3, 1081.1, 325.3, 1081.1, 631.8, 1157.2, 631.8, 1157.2, 694.8],
-	[1192, 694.8, 1192, 325.3, 1263.4, 325.3, 1263.4, 694.8],
-	[1310, 694.8, 1310, 325.3, 1386, 325.3, 1420, 502.3, 1420, 325.3, 1491.4, 325.3, 1491.4, 694.8, 1419.2, 694.8, 1382.2, 510, 1382.2, 694.8],
-	[1541.3, 694.8, 1541.3, 325.3, 1689.1, 325.3, 1689.1, 396.7, 1616.5, 396.7, 1616.5, 468.7, 1686.2, 468.7, 1686.2, 538.2, 1616.5, 538.2, 1616.5, 622.8, 1694, 622.8, 1694, 694.8],
+	[219.8, 694.8, 219.8, 325.3, 367.6, 325.3, 367.6, 397.3, 294.2, 397.3, 294.2, 456.1, 363.9, 456.1, 363.9, 527.3, 294.2, 527.3, 294.2, 694.8],
+	[408.6, 694.8, 408.6, 325.3, 482.5, 325.3, 482.5, 631.8, 558.5, 631.8, 558.5, 694.8],
+	[586.6, 694.8, 622.3, 325.3, 747.6, 325.3, 782.7, 694.8, 712.8, 694.8, 707.5, 635.2, 663, 635.2, 658.4, 694.8],
+	[668.3, 576.2, 701.9, 576.2, 685.7, 388.3, 682.3, 388.3],
+	[849.1, 694.8, 849.1, 396.2, 805.2, 396.2, 805.2, 325.3, 966.9, 325.3, 966.9, 396.2, 923, 396.2, 923, 694.8],
+	[1004.6, 694.8, 1004.6, 325.3, 1078.5, 325.3, 1078.5, 631.8, 1154.6, 631.8, 1154.6, 694.8],
+	[1189.4, 694.8, 1189.4, 325.3, 1260.8, 325.3, 1260.8, 694.8],
+	[1307.4, 694.8, 1307.4, 325.3, 1383.4, 325.3, 1417.4, 502.3, 1417.4, 325.3, 1488.8, 325.3, 1488.8, 694.8, 1416.6, 694.8, 1379.6, 510, 1379.6, 694.8],
+	[1538.7, 694.8, 1538.7, 325.3, 1686.5, 325.3, 1686.5, 396.7, 1613.9, 396.7, 1613.9, 468.7, 1683.6, 468.7, 1683.6, 538.2, 1613.9, 538.2, 1613.9, 622.8, 1691.4, 622.8, 1691.4, 694.8],
 ];
 
-const FLAT_PATH = FLAT_POLYS.map((p) => 'M' + p.join(' ') + 'Z').join('');
+const FLAT_GROW = 1.5; // px past the knockout edge: under the bar's anti-aliased edge, so no paper hairline and no dark line
 
-/** The letters as a 4 px grid, grown by 8 px so the black bar trims every dot that straddles an edge. */
-let flatGrid: Uint8Array | null = null;
-const GRID = 4;
-const GW = 1920 / GRID;
-const GH = 1080 / GRID;
-const inFlat = (x: number, y: number) => {
-	let c = false;
-	for (const p of FLAT_POLYS) {
-		for (let i = 0, j = p.length - 2; i < p.length; j = i, i += 2) {
-			const xi = p[i];
-			const yi = p[i + 1];
-			const xj = p[j];
-			const yj = p[j + 1];
-			if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
-		}
+/** A polygon (flat x, y list) offset outward by d px with mitred corners (whichever way it winds). */
+const offsetPoly = (p: number[], d: number): [number, number][] => {
+	const n = p.length / 2;
+	let area = 0;
+	for (let i = 0; i < n; i++) {
+		const j = (i + 1) % n;
+		area += p[2 * i] * p[2 * j + 1] - p[2 * j] * p[2 * i + 1];
 	}
-	return c;
-};
-const flatAt = (x: number, y: number) => {
-	if (!flatGrid) {
-		const raw = new Uint8Array(GW * GH);
-		for (let gy = 0; gy < GH; gy++) {
-			const y = (gy + 0.5) * GRID;
-			if (y < 300 || y > 720) continue;
-			for (let gx = 0; gx < GW; gx++) raw[gy * GW + gx] = inFlat((gx + 0.5) * GRID, y) ? 1 : 0;
-		}
-		flatGrid = new Uint8Array(GW * GH);
-		for (let gy = 2; gy < GH - 2; gy++) {
-			for (let gx = 2; gx < GW - 2; gx++) {
-				let on = 0;
-				for (let dy = -2; dy <= 2 && !on; dy++) for (let dx = -2; dx <= 2 && !on; dx++) on = raw[(gy + dy) * GW + gx + dx];
-				flatGrid[gy * GW + gx] = on;
-			}
-		}
-	}
-	const gx = Math.floor(x / GRID);
-	const gy = Math.floor(y / GRID);
-	return gx < 0 || gy < 0 || gx >= GW || gy >= GH ? 0 : flatGrid[gy * GW + gx];
+	const sg = area > 0 ? 1 : -1;
+	const normal = (i: number, j: number): [number, number] => {
+		const dx = p[2 * j] - p[2 * i];
+		const dy = p[2 * j + 1] - p[2 * i + 1];
+		const l = Math.hypot(dx, dy) || 1;
+		return [(sg * dy) / l, (-sg * dx) / l];
+	};
+	return Array.from({length: n}, (_, i): [number, number] => {
+		const [ax, ay] = normal((i + n - 1) % n, i);
+		const [bx, by] = normal(i, (i + 1) % n);
+		const k = d / (1 + ax * bx + ay * by);
+		return [p[2 * i] + (ax + bx) * k, p[2 * i + 1] + (ay + by) * k];
+	});
 };
 
-/** P7 printed cold, only inside the FLATLINE letters (nothing ghosts through the black). */
-const p7Cold = (map: Density): Sheet => ({
-	map,
-	...P7_SHEET,
-	seed: P7_SEED,
-	plates: [{...P7_COLD, mask: (u, v) => flatAt(P7_SHEET.cx + (u - 0.5) * P7_SHEET.w, P7_SHEET.cy + (v - 0.5) * P7_SHEET.h)}],
+/**
+ * The FLATLINE windows grown 1.5 px (FLAT_GROW), as one clip path in P7_SHEET paper fractions: every letter is reached from the F by
+ * a bridge walked out and back, which adds nothing under the nonzero rule. The cold lines end just under the bar's
+ * knockout edge instead of overprinting its ink. (The A's counter is left as it is: its top is 3 px wide.)
+ */
+const FLAT_GROWN = FLAT_POLYS.map((p, n) => offsetPoly(p, n === 3 ? 0 : FLAT_GROW));
+/** The grown windows as an SVG / CSS path in frame px (for the lids' clip and the orange flush). */
+const FLAT_GROWN_PATH = FLAT_GROWN.map((poly) => 'M' + poly.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' ') + 'Z').join(' ');
+const FLAT_CLIP: [number, number][] = (() => {
+	const x0 = P7_SHEET.cx - P7_SHEET.w / 2;
+	const y0 = P7_SHEET.cy - P7_SHEET.h / 2;
+	const polys = FLAT_GROWN;
+	const anchor = polys[0][0];
+	const pts: [number, number][] = [];
+	polys.forEach((poly, n) => {
+		pts.push(...poly, poly[0]);
+		if (n) pts.push(anchor);
+	});
+	return pts.map(([x, y]) => [(x - x0) / P7_SHEET.w, (y - y0) / P7_SHEET.h]);
+})();
+
+// The phones' glow as s_couch prints it before anyone is warmed (its bloom(), all four phones live): bare paper round
+// each phone that stays dark, throbbing on the beat. It reaches up into the bottom of the letters.
+const A7 = 2752 / 1536;
+const PHONES = FRIENDS.map((f) => {
+	const q = P7_PHONES[f];
+	return {poly: q, b: bbox(q), u: q.reduce((a, p) => a + p[0], 0) / 4, v: q.reduce((a, p) => a + p[1], 0) / 4};
 });
+const phoneBloom = (t: number) => {
+	const g = 0.7 + 0.25 * pulse(t, 0.16);
+	return (u: number, v: number): number => {
+		let b = 0;
+		for (const p of PHONES) {
+			const dx = ((u - p.u) * A7) / 0.075;
+			const dy = (v - (p.v - 0.04)) / 0.105;
+			const e = dx * dx + dy * dy;
+			if (e > 5) continue;
+			if (u >= p.b.x0 && u <= p.b.x1 && v >= p.b.y0 && v <= p.b.y1 && inPoly(p.poly, u, v)) return 0;
+			b = Math.max(b, g * Math.exp(-e));
+		}
+		return b;
+	};
+};
+
+/** P7 printed cold, clipped to the FLATLINE windows (nothing ghosts through the black). */
+const p7Cold = (map: Density, t: number): Sheet => {
+	const glow = phoneBloom(t);
+	return {map: screenMap(map), ...P7_SHEET, seed: P7_SEED, clip: FLAT_CLIP, plates: [{...P7_COLD, mask: (u, v) => 1 - glow(u, v)}]};
+};
 
 const THUMPS = [bt(61, 2), bt(61, 4)];
+const LID_TOP = 300;
+const LID_MID = 510;
+const LID_BOT = 720;
 const WIPE = 0.2;
 
 export const ReversePull: React.FC<{t: number}> = ({t}) => {
@@ -437,7 +495,17 @@ export const ReversePull: React.FC<{t: number}> = ({t}) => {
 	const lean = 90; // the blade leans: its top runs ahead
 	const edge = lerp(-2 * lean, 1920 + 2 * lean, wipe);
 	const thump = Math.max(...THUMPS.map((b) => (t >= b ? Math.exp(-(t - b) / 0.11) : 0)));
-	const open = easeOut((t - bt(61, 3)) / (5 / 30));
+	// 61.3: the letters' paper opens like eyelids from their centre line (y 510), already 40% open on the beat's own
+	// frame so P7 shows on it, then fully open over 5 frames
+	const opened = t >= bt(61, 3);
+	const open = opened ? 0.4 + 0.6 * easeOut((t - bt(61, 3)) / (5 / 30)) : 0;
+	const lid = (top: number, h: number, shadow: string) => (
+		<div style={{position: 'absolute', left: 0, top, width: 1920, height: h, overflow: 'hidden', boxShadow: shadow}}>
+			<div style={{position: 'absolute', left: 0, top: -top, width: 1920, height: 1080}}>
+				<PaperFill />
+			</div>
+		</div>
+	);
 	const ts = 1 + 0.022 * thump;
 	const tx = thump * 5;
 	const ty = thump * 3;
@@ -447,17 +515,19 @@ export const ReversePull: React.FC<{t: number}> = ({t}) => {
 			<AbsoluteFill style={{clipPath: wipe < 1 ? `polygon(-10px -10px, ${edge + lean}px -10px, ${edge - lean}px 1090px, -10px 1090px)` : undefined}}>
 				<AbsoluteFill style={{transform: `translate(${tx}px, ${ty}px) scale(${ts})`}}>
 					<PaperFill />
-					{d && t >= bt(61, 3) && <Press sheets={[p7Cold(d.P7)]} />}
-					{/* the letters' paper opens from their centre line like eyelids */}
-					{open < 1 && (
-						<div style={{position: 'absolute', left: -40, top: -40, width: 2000, height: 1160, transformOrigin: '50% 510px', transform: `scaleY(${1 - open})`}}>
-							<PaperFill />
+					{d && opened && <Press sheets={[p7Cold(d.P7, t)]} />}
+					{/* the lids: the letter band (y 325-695, centre 510) split at its centre line, each half sliding back; clipped
+					    to the windows so neither the paper nor its shadow shows through the (multiplied) bar */}
+					{opened && open < 1 && (
+						<div style={{position: 'absolute', left: 0, top: 0, width: 1920, height: 1080, clipPath: `path('${FLAT_GROWN_PATH}')`}}>
+							{lid(LID_TOP, (LID_MID - LID_TOP) * (1 - open), '0 5px 9px rgba(40,25,10,0.32)')}
+							{lid(LID_MID + (LID_BOT - LID_MID) * open, (LID_BOT - LID_MID) * (1 - open), '0 -5px 9px rgba(40,25,10,0.32)')}
 						</div>
 					)}
 					{/* a heartbeat tries: the letters flush orange on each thump */}
 					{thump > 0.02 && (
 						<svg viewBox="0 0 1920 1080" style={{position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.9 * thump, mixBlendMode: 'multiply'}}>
-							<path d={FLAT_PATH} fill={INK.heat} fillRule="evenodd" stroke={INK.heat} strokeWidth={10} strokeLinejoin="round" />
+							<path d={FLAT_GROWN_PATH} fill={INK.heat} />
 						</svg>
 					)}
 					<FlatlineBar x={-40} y={-40} w={2000} h={1160} text="FLATLINE" size={430} />

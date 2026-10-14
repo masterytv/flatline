@@ -198,15 +198,21 @@ const Readout: React.FC<{right: number; base: number; size: number; value: strin
 
 // ------------------------------------------------------------------ 1:32 "Flatline": eight progressive proofs of P1
 
-type ProofPlate = {ch: 0 | 1 | 2; ink: string; angle: number; kind?: 'dot' | 'line'; off?: boolean; gain?: number};
-type Proof = {code: string; screen: string; paper?: string; plates: ProofPlate[]; mis: [number, number]; bar: string; ghost?: string};
+type ProofPlate = {ch: 0 | 1 | 2; ink: string; angle: number; kind?: 'dot' | 'line'; off?: boolean; gain?: number; gamma?: number};
+/** `rim`: the misregistered plate prints only where the bar's ink doesn't, a fringe at the edges and in the letters. */
+type Proof = {code: string; screen: string; paper?: string; plates: ProofPlate[]; mis: [number, number]; bar: string; ghost?: string; rim?: boolean};
+
+/** Pale orange stock for the cold-on-orange proof: on full heat stock ultramarine multiplies to brown. */
+const PALE_STOCK = '#FFB383';
 
 // Orange is real life, ultramarine the screen world (a line screen, like the opening's memories). The cold proofs are
 // the phone trying to come back; the last proof is black + orange in register: real life, printed.
+// The single-ink proofs run thinner (gain ~0.8, a little gamma) so the crowd under the bar opens up instead of
+// printing as a slab.
 const PROOFS: Proof[] = [
-	{code: 'K', screen: 'K 45°  ·  85 LPI', plates: [{ch: 0, ink: INK.key, angle: 45}], mis: [0, 0], bar: INK.key},
-	{code: 'O', screen: 'O 15°  ·  85 LPI', plates: [{ch: 1, ink: INK.heat, angle: 15}], mis: [0, 0], bar: INK.heat},
-	{code: 'U', screen: 'U 75° LINE  ·  85 LPI', plates: [{ch: 2, ink: INK.cold, angle: 75, kind: 'line'}], mis: [0, 0], bar: INK.cold},
+	{code: 'K', screen: 'K 45°  ·  85 LPI', plates: [{ch: 0, ink: INK.key, angle: 45, gain: 0.8, gamma: 1.2}], mis: [0, 0], bar: INK.key},
+	{code: 'O', screen: 'O 15°  ·  85 LPI', plates: [{ch: 1, ink: INK.heat, angle: 15, gain: 0.8, gamma: 1.2}], mis: [0, 0], bar: INK.heat},
+	{code: 'U', screen: 'U 75° LINE  ·  85 LPI', plates: [{ch: 2, ink: INK.cold, angle: 75, kind: 'line', gain: 0.84}], mis: [0, 0], bar: INK.cold},
 	{
 		code: 'K+O',
 		screen: 'K 45°  ·  O 15°  ·  OFF +9 −5',
@@ -218,19 +224,20 @@ const PROOFS: Proof[] = [
 		bar: INK.key,
 		ghost: INK.heat,
 	},
-	{code: 'K / O STOCK', screen: 'K 45°  ·  ORANGE STOCK', paper: INK.heat, plates: [{ch: 0, ink: INK.key, angle: 45}], mis: [0, 0], bar: INK.key},
+	{code: 'K / O STOCK', screen: 'K 45°  ·  ORANGE STOCK', paper: INK.heat, plates: [{ch: 0, ink: INK.key, angle: 45, gain: 0.84, gamma: 1.15}], mis: [0, 0], bar: INK.key},
 	{
 		code: 'U+O',
 		screen: 'U 75° LINE  ·  O 15°  ·  OFF −7 +4',
 		plates: [
-			{ch: 1, ink: INK.heat, angle: 15, off: true},
-			{ch: 0, ink: INK.cold, angle: 75, kind: 'line', gain: 1.15},
+			{ch: 1, ink: INK.heat, angle: 15, off: true, gain: 0.6, gamma: 1.2},
+			{ch: 0, ink: INK.cold, angle: 75, kind: 'line', gain: 1.1},
 		],
 		mis: [-7, 4],
 		bar: INK.cold,
 		ghost: INK.heat,
+		rim: true,
 	},
-	{code: 'U / O STOCK', screen: 'U 75° LINE  ·  ORANGE STOCK', paper: INK.heat, plates: [{ch: 2, ink: INK.cold, angle: 75, kind: 'line', gain: 0.9}], mis: [0, 0], bar: INK.cold},
+	{code: 'U / O STOCK', screen: 'U 75° LINE  ·  PALE ORANGE STOCK', paper: PALE_STOCK, plates: [{ch: 2, ink: INK.cold, angle: 75, kind: 'line', gain: 0.9}], mis: [0, 0], bar: INK.cold},
 	{
 		code: 'K+O  OK',
 		screen: 'K 45°  ·  O 15°  ·  IN REGISTER',
@@ -293,8 +300,16 @@ const ProofBar: React.FC<{proof: Proof; paper: string; dx: number; dy: number; h
 					{left: dx, top: dy, mixBlendMode: 'multiply', ...inked(800, 57, 21, true)},
 					<>
 						<defs>
-							<mask id={`${id}g`}>
-								<rect x={-20} y={-20} width={w + 40} height={h + 40} fill="white" />
+							<mask id={`${id}g`} maskUnits="userSpaceOnUse" x={-60} y={-60} width={w + 120} height={h + 120}>
+								<rect x={-60} y={-60} width={w + 120} height={h + 120} fill="white" />
+								{proof.rim && (
+									// only where the bar's own ink doesn't print: its edges and the trapped letter windows
+									<g transform={`translate(${-dx} ${-dy})`}>
+										<rect width={w} height={h} fill="black" />
+										{text('white', TRAP)}
+										{hr > 0 && <g opacity={hr}>{hrText('white')}</g>}
+									</g>
+								)}
 								{text('black', TRAP)}
 								{hr > 0 && hrText('black')}
 							</mask>
@@ -370,14 +385,13 @@ export const Progs: React.FC<{t: number}> = ({t}) => {
 		cell: p.kind === 'line' ? 9 : 8.5,
 		kind: p.kind,
 		gain: (p.gain ?? 1) * fresh,
+		gamma: p.gamma,
 		dx: offs[k][0],
 		dy: offs[k][1],
 	}));
 	const bar = stamp(t, F.flatline2);
 	// the readout slug inks in on 49.2 and is fully on by 92.672 (the plan's cue, F.flatline2 + 0.5)
 	const hr = clamp01((t - PROOF_T[1]) / (F.flatline2 + 0.5 - PROOF_T[1]));
-	// the opening's lime wire turns to ink over the first half-beat
-	const lime = 1 - easeOut((t - F.flatline2) / 0.45);
 	const offAt = proof.plates.findIndex((p) => p.off);
 	const ghost = proof.ghost && offAt >= 0 ? offs[offAt] : [0, 0];
 	const alive = (b: number) => b >= F.flatline2;
@@ -390,9 +404,8 @@ export const Progs: React.FC<{t: number}> = ({t}) => {
 			{d && <Press cam={cam} sheets={[posterSheet(d.P1, plates)]} />}
 			<CamLayer cam={cam}>
 				<SheetMarks plates={proof.plates.map((p, k) => ({ink: p.ink, dx: offs[k][0], dy: offs[k][1]}))} code={`PROG ${n + 1}/8 · ${proof.code}`} screen={proof.screen} />
-				{/* the wire: lime from the hand-over, then the Rule in ink. Flat stubs either side of the bar. */}
-				<Trace t={t} amp={amp} alive={alive} color={INK.key} width={4} opacity={1 - lime} />
-				{lime > 0 && <Trace t={t} amp={amp} alive={alive} color={INK.lime} width={4} opacity={lime} blend={false} />}
+				{/* the wire: the hand-over's lime wire becomes the Rule in key ink on the hit. Flat stubs either side of the bar. */}
+				<Trace t={t} amp={amp} alive={alive} color={INK.key} width={4} />
 				<div
 					style={{
 						position: 'absolute',
@@ -408,7 +421,6 @@ export const Progs: React.FC<{t: number}> = ({t}) => {
 					{/* the monitor inside the bar: the trace knocked out of the ink, spikes born at the right end on every kick */}
 					<div style={{position: 'absolute', left: -BAR.x, top: -BAR.y}}>
 						<Trace t={t} amp={amp} alive={alive} color={paper} width={4} clip={[BAR.x + 2, BAR.x + BAR.w - 2]} stubs={false} blend={false} />
-						{lime > 0 && <Trace t={t} amp={amp} alive={alive} color={INK.lime} width={4} clip={[BAR.x + 2, BAR.x + BAR.w - 2]} stubs={false} blend={false} opacity={lime} />}
 					</div>
 				</div>
 			</CamLayer>
@@ -442,7 +454,7 @@ const EcgPaper: React.FC<{shift: number}> = ({shift}) => {
 
 const HEART = {
 	x: 150,
-	base: 462, // MY HEART, the readout and "and I started" sit on this line, above the Rule
+	base: 462, // MY HEART, the readout and "and I" sit on this line, above the Rule
 	size: 290,
 	stoppedTop: 592, // STOPPED hangs from the Rule
 	hrRight: 1772,
@@ -464,15 +476,36 @@ const tempoAt = (t: number) => {
 	return 60 / (BEATS[i].t - BEATS[i - 1].t);
 };
 
-const easeIn3 = (x: number) => Math.pow(clamp01(x), 2.6);
+/** The monitor finds her rate on the beat after MY HEART lands (51.2); until then it reads – – – (acquiring). */
+const ACQ = BEATS[lastBeatIndex(F.heart + 0.001) + 1].t;
 
-/** Words knocked off the page on "and I started": a kick down and a spin, gone in about 8 frames. */
-const fall = (t: number, k: number) => {
-	const dt = Math.max(0, t - F.started);
-	if (dt <= 0) return {y: 0, rot: 0, o: 1};
-	// knocked: already a third of a line down on the first frame, so "and I started" lands on clear paper
-	return {y: 210 + 3000 * dt + 6000 * dt * dt * (1 + 0.15 * k), rot: (k % 2 ? 1 : -1) * (6 + 3 * k) * easeOut(dt / 0.15), o: 0.42 * (1 - clamp01(dt / 0.15))};
-};
+/** "and I / started": the human voice takes MY HEART's and STOPPED's slots on the page. */
+const AND_I = {size: 300};
+const STARTED = {size: 470, base: HEART.stoppedTop - 4 + 470 * 0.743}; // the 'd' ascender (0.743 em) hangs from the Rule like STOPPED
+
+/** Italic set by its baseline. The box is padded so the ink mask doesn't clip the italic overhangs. */
+const SerifAt: React.FC<{x: number; base: number; size: number; color: string; s: number; seed: number; children: React.ReactNode}> = ({x, base, size, color, s, seed, children}) => (
+	<div
+		style={{
+			position: 'absolute',
+			left: x - size * 0.3,
+			top: base - size * 0.84,
+			padding: `0 ${size * 0.3}px`,
+			fontFamily: SERIF,
+			fontStyle: 'italic',
+			fontSize: size,
+			lineHeight: 1,
+			whiteSpace: 'nowrap',
+			color,
+			mixBlendMode: 'multiply',
+			transform: `scale(${s})`,
+			transformOrigin: `${size * 0.3}px 85%`,
+			...inked(800, seed * 17, seed * 5, true),
+		}}
+	>
+		{children}
+	</div>
+);
 
 export const Heart: React.FC<{t: number}> = ({t}) => {
 	const stopped = t >= F.stopped;
@@ -480,10 +513,14 @@ export const Heart: React.FC<{t: number}> = ({t}) => {
 	const hold = stopped && !started;
 	// the paper drifts on from the proofs, stops dead on "stopped" and moves again on "started"
 	const live = Math.min(t, F.stopped) - F.heart + (started ? t - F.started : 0);
-	// from "started" the camera accelerates in on the line, into the DANCING slam
-	const push = started ? easeIn3((t - F.started) / (F.dancing - F.started)) : 0;
+	// from "started" the camera pushes in on the page from the first frame (gentle ease-in, into the DANCING slam),
+	// and every new beat pumps it a little: the heart is back
+	const bi = lastBeatIndex(t);
+	const push = started ? Math.pow(clamp01((t - F.started) / (F.dancing - F.started)), 1.5) : 0;
+	const pump = started && BEATS[bi].t >= F.started ? 0.014 * Math.exp(-(t - BEATS[bi].t) / 0.09) : 0;
 	const cx0 = sheetCam(F.flatline2).cx - 7 * live;
-	const cam: Cam = {cx: cx0 + (962 - cx0) * push, cy: 540 - 100 * push, s: 1 + 0.14 * push};
+	// re-centred on the page (type 140–1830 wide, 200–890 tall) so the push crops both sides evenly
+	const cam: Cam = {cx: cx0 + (944 - cx0) * push, cy: 540 + 6 * push, s: 1 + 0.08 * push + pump};
 	// the chart paper lurches one square per beat while there is a beat
 	let shift = 0;
 	for (const b of beatsIn(F.heart - 0.001, t + 0.001)) {
@@ -498,20 +535,20 @@ export const Heart: React.FC<{t: number}> = ({t}) => {
 	const my = stamp(t, F.heart);
 	const st = stamp(t, F.stopped);
 	// MY HEART beats twice in heat (a misregistered pulse) before it stops
-	const bi = lastBeatIndex(t);
 	const pulseK = !stopped && BEATS[bi].t >= F.heart ? Math.exp(-(t - BEATS[bi].t) / 0.11) : 0;
 	const pa = hash2(bi, 7, 3) * Math.PI * 2;
 	const gx = Math.cos(pa) * 11 * pulseK;
 	const gy = Math.sin(pa) * 7 * pulseK;
-	// HR: – – – until "stopped", 0 through the stop, then counting up to the live tempo by F.started + 1.4
+	// HR: – – – while the monitor acquires (one beat), then her rate on every beat while the trace beats, 0 through
+	// the stop, then counting up to the live tempo by F.started + 1.4 and ticking it on every beat
+	const acquiring = t < ACQ;
 	const countK = easeOut((t - F.started) / 1.4);
-	const hrVal = !stopped ? '–––' : !started ? '0' : String(Math.round(tempoAt(t) * countK));
+	const hrVal = !stopped ? (acquiring ? '–––' : String(Math.round(tempoAt(t)))) : !started ? '0' : String(Math.round(tempoAt(t) * countK));
 	const hrInk = started ? INK.heat : INK.key;
-	const hrS = !stopped ? my.s : !started ? st.s : t < F.started + 1.4 ? 1 : stamp(t, BEATS[bi].t).s;
+	const hrS = !stopped ? (acquiring ? my.s : stamp(t, BEATS[bi].t).s) : !started ? st.s : t < F.started + 1.4 ? 1 : stamp(t, BEATS[bi].t).s;
 	const head = started ? headValue(t, aliveNew) : stopped ? 0 : headValue(t, aliveOld);
-	const words = fall(t, 0);
-	const words2 = fall(t, 1);
 	const startedS = stamp(t, F.started);
+	const slug = started ? 'SINUS RHYTHM · PRINT 2/2' : stopped ? 'ASYSTOLE' : acquiring ? 'ACQUIRING' : 'SINUS RHYTHM';
 	return (
 		<AbsoluteFill style={{background: INK.paper}}>
 			<CamLayer cam={cam}>
@@ -532,73 +569,60 @@ export const Heart: React.FC<{t: number}> = ({t}) => {
 						mixBlendMode: 'multiply',
 					}}
 				/>
-				{words.o > 0 && (
+				{/* on "and I started" the page is cleared on the hit: no words fall through the new ones */}
+				{!started && (
 					<>
-						<div style={{position: 'absolute', left: 0, top: 0, transform: `translateY(${words.y}px) rotate(${words.rot}deg)`, transformOrigin: `${HEART.x + 500}px ${HEART.base}px`, opacity: words.o}}>
-							{pulseK > 0.02 && (
-								<AntonAt x={HEART.x} base={HEART.base} size={HEART.size} color={INK.heat} s={my.s} dx={gx} dy={gy} seed={2}>
-									MY HEART
-								</AntonAt>
-							)}
-							<AntonAt x={HEART.x} base={HEART.base} size={HEART.size} color={INK.key} s={my.s} seed={1}>
+						{pulseK > 0.02 && (
+							<AntonAt x={HEART.x} base={HEART.base} size={HEART.size} color={INK.heat} s={my.s} dx={gx} dy={gy} seed={2}>
 								MY HEART
 							</AntonAt>
-						</div>
-						<div style={{position: 'absolute', left: 0, top: 0, transform: `translateY(${words2.y}px) rotate(${words2.rot}deg)`, transformOrigin: `${HEART.x + 450}px ${STOPPED_BASE}px`, opacity: words2.o}}>
-							{st.on && (
-								<AntonAt x={HEART.x} base={STOPPED_BASE} size={HEART.size} color={INK.heat} s={st.s} seed={3}>
-									STOPPED
-								</AntonAt>
-							)}
-							{DOTS.map((b, i) => {
-								if (t < b) return null;
-								const s = stamp(t, b).s;
-								const D = 70;
-								return (
-									<div
-										key={i}
-										style={{
-											position: 'absolute',
-											left: HEART.x + STOPPED_W + 46 + i * 108,
-											top: STOPPED_BASE - D,
-											width: D,
-											height: D,
-											borderRadius: '50%',
-											background: INK.key,
-											mixBlendMode: 'multiply',
-											transform: `scale(${s})`,
-											...inked(300, i * 50, 0, true),
-										}}
-									/>
-								);
-							})}
-						</div>
+						)}
+						<AntonAt x={HEART.x} base={HEART.base} size={HEART.size} color={INK.key} s={my.s} seed={1}>
+							MY HEART
+						</AntonAt>
+						{st.on && (
+							<AntonAt x={HEART.x} base={STOPPED_BASE} size={HEART.size} color={INK.heat} s={st.s} seed={3}>
+								STOPPED
+							</AntonAt>
+						)}
+						{DOTS.map((b, i) => {
+							if (t < b) return null;
+							const s = stamp(t, b).s;
+							const D = 70;
+							return (
+								<div
+									key={i}
+									style={{
+										position: 'absolute',
+										left: HEART.x + STOPPED_W + 46 + i * 108,
+										top: STOPPED_BASE - D,
+										width: D,
+										height: D,
+										borderRadius: '50%',
+										background: INK.key,
+										mixBlendMode: 'multiply',
+										transform: `scale(${s})`,
+										...inked(300, i * 50, 0, true),
+									}}
+								/>
+							);
+						})}
 					</>
 				)}
+				{/* "and I" takes MY HEART's place on the line; "started" hangs from the Rule where STOPPED was, in heat (life) */}
 				{started && (
-					<div
-						style={{
-							position: 'absolute',
-							left: HEART.x - 8,
-							top: HEART.base - 236 * 0.84,
-							fontFamily: SERIF,
-							fontStyle: 'italic',
-							fontSize: 236,
-							lineHeight: 1,
-							whiteSpace: 'nowrap',
-							color: INK.key,
-							mixBlendMode: 'multiply',
-							transform: `scale(${startedS.s})`,
-							transformOrigin: '0% 85%',
-							...inked(800, 17, 5, true),
-						}}
-					>
-						and I started
-					</div>
+					<>
+						<SerifAt x={HEART.x - 10} base={HEART.base} size={AND_I.size} color={INK.key} s={startedS.s} seed={1}>
+							and I
+						</SerifAt>
+						<SerifAt x={HEART.x - 22} base={STARTED.base} size={STARTED.size} color={INK.heat} s={startedS.s} seed={2}>
+							started
+						</SerifAt>
+					</>
 				)}
 				<Readout right={HEART.hrRight} base={HEART.base} size={HEART.hrSize} value={hrVal} ink={hrInk} s={hrS} />
 				<Slug x={HEART.x} y={1012} size={17} text={`FLATLINE · 1:36 · LEAD II · 25 mm/s · 10 mm/mV`} />
-				<Slug x={HEART.hrRight - 250} y={1012} size={17} text={started ? 'SINUS · PRINT 2/2' : stopped ? 'ASYSTOLE' : 'NO SIGNAL'} />
+				<Slug x={HEART.hrRight - 250} y={1012} size={17} text={slug} />
 			</CamLayer>
 		</AbsoluteFill>
 	);
