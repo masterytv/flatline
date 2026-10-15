@@ -24,3 +24,6 @@ build/
 # Secrets
 .env
 .env.*
+
+# Python
+__pycache__/
