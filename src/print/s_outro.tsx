@@ -24,21 +24,33 @@ type Photo = {
 	stack?: Pt[];
 };
 
-/**
- * The outro's photos. P50-P54 haven't been generated yet (Runway credits), so their values come from the prompts in
- * docs/image-prompts.md, not from the photos: re-check every PROVISIONAL value against the real still.
- */
+/** The outro's photos. Every value below was read off the real still on a u/v grid. */
 const PHOTOS: Record<string, Photo> = {
-	P50: {map: 'P50', split: [0.53, 0.46]}, // PROVISIONAL until P50 exists: 'the horizon crosses the middle of the frame'
-	P51: {map: 'P51', split: [0.56, 0.47]}, // PROVISIONAL until P51 exists: her profile (frame middle) sits on the ink line
-	P52: {map: 'P52', split: [0.4, 0.34]}, // PROVISIONAL until P52 exists: the sky band between the buildings, upper third
-	P53: {map: 'P53'}, // PROVISIONAL until P53 exists: trace `stack` (the face-down pile) off the photo to get the key slab
-	P54: {map: 'P54'},
+	P50: {map: 'P50', split: [0.53, 0.46]}, // the horizon at v 0.39: the warm ink holds the roofs, the night the sky
+	P51: {map: 'P51', split: [0.36, 0.29]}, // her head v 0.15-0.43 (eye 0.30): the blend crosses her face and warms it as it rises
+	P52: {map: 'P52', split: [0.4, 0.34]}, // the sky gap between the buildings, above v 0.3
+	P53: {
+		map: 'P53',
+		// the face-down pile (u 0.307-0.637, v 0.375-0.766), its silhouette including the lit charging ends
+		stack: [
+			[0.307, 0.442],
+			[0.317, 0.422],
+			[0.394, 0.377],
+			[0.409, 0.375],
+			[0.629, 0.462],
+			[0.637, 0.478],
+			[0.637, 0.714],
+			[0.631, 0.735],
+			[0.561, 0.765],
+			[0.552, 0.766],
+			[0.313, 0.627],
+			[0.309, 0.606],
+		],
+	},
+	// all five asleep: cropped in so the faces read on the card (Sam's curls from u 0.068, Dev's face down to v 0.69)
+	P54: {map: 'P54', crop: [0.06, 0.11, 0.79, 0.84]},
 };
-
-/** Dev only: stand-ins for photos that don't exist yet (src/print/dev/outro.ts fills it). Empty in the film. */
-export const STANDINS: Record<string, Photo> = {};
-const photo = (id: string): Photo => STANDINS[id] ?? PHOTOS[id];
+const photo = (id: string): Photo => PHOTOS[id];
 
 const FR = 1 / 30;
 
@@ -150,7 +162,7 @@ const deal = (t: number, c: Card) => {
 	const land = clamp01((t - (c.t + 0.12)) / 0.2);
 	const shove = c.first ? easeOut((t - (STUB_IN - FR)) / 0.2) : 1;
 	const [bx, by, br] = c.first ? [lerp(c.first[0], c.cx, shove), lerp(c.first[1], c.cy, shove), lerp(c.first[2], c.rot, shove)] : [c.cx, c.cy, c.rot];
-	return {on: t >= c.t, cx: bx + c.from[0] * (1 - e), cy: by + c.from[1] * (1 - e), rot: br + c.from[2] * (1 - e), s: 1 + 0.035 * (1 - easeOut(land)) * (k >= 1 ? 1 : 0) + 0.06 * (1 - e), land};
+	return {on: t >= c.t, cx: bx + c.from[0] * (1 - e), cy: by + c.from[1] * (1 - e), rot: br + c.from[2] * (1 - e), s: 1 + 0.035 * (1 - easeOut(land)) + 0.06 * (1 - e), land};
 };
 
 const PostcardPrint: React.FC<{t: number; c: Card; map: Sheet['map'] | null}> = ({t, c, map}) => {
@@ -274,6 +286,7 @@ const loop = (cx: number, cy: number, rx: number, ry: number): string => {
 	return `M ${pts.join(' L ')}`;
 };
 const ZERO_LOOP = loop(106, 378, 122, 166);
+const RING = 0.12; // the loop closes on the third frame after zero and holds closed until the cut (209.0)
 
 const Stub: React.FC<{t: number}> = ({t}) => {
 	if (t < STUB_IN - FR) return null;
@@ -339,7 +352,7 @@ const Stub: React.FC<{t: number}> = ({t}) => {
 			{t >= ZERO && (
 				// on zero a hand rings '0 MIN' in grease pencil, and the same pencil draws the living line on the cut
 				<svg width={STUB.w} height={STUB.h} style={{position: 'absolute', left: 0, top: 0, overflow: 'visible', mixBlendMode: 'multiply', ...inked(520, 7, 3)}}>
-					<path d={ZERO_LOOP} pathLength={1} fill="none" stroke={INK.heat} strokeWidth={9} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={1} strokeDashoffset={1 - easeOut((t - ZERO + 0.5 * FR) / 0.19)} opacity={0.93} />
+					<path d={ZERO_LOOP} pathLength={1} fill="none" stroke={INK.heat} strokeWidth={9} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={1} strokeDashoffset={1 - easeOut((t - ZERO + 0.5 * FR) / RING)} opacity={0.93} />
 				</svg>
 			)}
 			<Perf w={STUB.w} y={-9} flip />
@@ -381,7 +394,10 @@ const livingPoints = (t: number): Pt[] => {
 		let y = 0;
 		for (const b of LINE_BEATS) {
 			const dt = (tau - b) / PEN.stretch;
-			if (b <= now && dt > -0.2 && dt < 0.26) y += ecg(dt);
+			// the pen draws each beat's lead-in (P wave, Q dip) as it passes; a beat whose P wave would start before
+			// the line does (the first, 0.19 s in) begins at the Q dip instead of halfway up a bump
+			const lo = b - 0.2 * PEN.stretch >= F.stillDancing ? -0.2 : -0.06;
+			if (dt > lo && dt < 0.26) y += ecg(dt);
 		}
 		const wob = Math.sin(x * 0.019 + 0.7) * 1.8 + Math.sin(x * 0.0071 + 2.1) * 4.5 + Math.sin(x * 0.043) * 0.7;
 		pts.push([x, PEN.y - y * PEN.amp + wob]);

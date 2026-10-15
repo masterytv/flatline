@@ -3,7 +3,7 @@ import {F} from '../full/cues';
 import {bt} from '../timing';
 import {useDensities} from './density';
 import {hash2, INK, SERIF} from './ink';
-import {clamp01, easeInOut, easeOut, inked, lerp} from './kit';
+import {clamp01, easeOut, inked, lerp} from './kit';
 import {Sheet} from './press';
 import {Press} from './Press';
 
@@ -15,17 +15,23 @@ import {Press} from './Press';
 /** Maya in the photo: centre and radii as photo fractions, tilt in degrees (the grease-pencil ring). */
 export type MayaRing = {u: number; v: number; rx: number; ry: number; tilt: number};
 
-// PROVISIONAL until P49 exists: the prompt puts Maya nearest the lens, slightly left of centre, head and shoulders
-// inside u 0.30-0.64, v 0.20-0.86. Re-trace from the real photo (gridded copy) when it arrives.
-export const P49_MAYA: MayaRing = {u: 0.45, v: 0.5, rx: 0.135, ry: 0.3, tilt: -4};
-
-/** Dev only: print another photo where P49 goes (with Maya traced on it) to check the effect before P49 exists. */
-export const KEEPSAKE_STANDIN: {map?: string; maya?: MayaRing} = {};
+// Traced on a gridded P49 (scratchpad/build/final-fix/g_P49_maya.png): her face is u 0.36-0.45, v 0.29-0.58, her hair
+// u 0.315-0.465 (crown at u 0.39, v 0.275). Kai's hair starts at u 0.455 (v 0.30-0.40) and his face at u 0.47, so the
+// loop holds her head and hair and leaves Kai outside it (checked over the photo: rings2z.png).
+export const P49_MAYA: MayaRing = {u: 0.386, v: 0.44, rx: 0.08, ry: 0.205, tilt: -5};
+/** Her face on P49, a soft ellipse in photo fractions: flash-lit and fair, it is the lightest face in the print, so
+ *  the heat plate is pushed there (dodge and burn) to keep her eyes, nose and mouth. */
+const P49_FACE = {u: 0.405, v: 0.43, rx: 0.07, ry: 0.17, boost: 2.4};
+const faceBoost = (u: number, v: number) => {
+	const e = ((u - P49_FACE.u) / P49_FACE.rx) ** 2 + ((v - P49_FACE.v) / P49_FACE.ry) ** 2;
+	return 1 + P49_FACE.boost * clamp01(1 - e);
+};
 
 const LAND = bt(108); // 200.110: lands as DANCING jumps to the top band
 const PENCIL = bt(108, 2); // 200.562: the grease pencil starts
 const CLOSE = bt(108, 3); // 201.015: the circle closes round Maya
 const SLIDE = 0.2;
+const LEAD = 0.035; // moves that start on a beat are already under way on the beat's own frame
 const EXIT = 0.42; // after F.dawn it is gone in a beat
 
 /** Where it lands (screen px): the image area, centred under the top band. */
@@ -36,7 +42,7 @@ const KFOOT = 66; // the caption strip
 export const KEEP_BOX = {w: KEEP.w + 2 * KB, h: KEEP.h + KB + KFOOT};
 
 export const keepPose = (t: number) => {
-	const k = easeOut((t - LAND + 0.035) / SLIDE); // already sliding in on the beat's own frame
+	const k = easeOut((t - LAND + LEAD) / SLIDE); // already sliding in on the beat's own frame
 	const x = clamp01((t - F.dawn) / EXIT);
 	const off = x * x;
 	return {
@@ -73,9 +79,7 @@ const ringPath = (ring: MayaRing, w: number, h: number) => {
 
 /** The keepsake: a white-bordered print (still two inks, never a photograph), Maya circled in grease pencil. */
 export const KeepsakePrint: React.FC<{t: number}> = ({t}) => {
-	const mapId = KEEPSAKE_STANDIN.map ?? 'P49';
-	const ring = KEEPSAKE_STANDIN.maya ?? P49_MAYA;
-	const d = useDensities([mapId]);
+	const d = useDensities(['P49']);
 	if (t < LAND) return null;
 	const q = keepPose(t);
 	if (q.cx < -1600) return null;
@@ -85,7 +89,7 @@ export const KeepsakePrint: React.FC<{t: number}> = ({t}) => {
 	const pcy = q.cy + Math.cos(r) * off;
 	const sheet: Sheet | null = d
 		? {
-				map: d[mapId],
+				map: d.P49,
 				w: KEEP.w,
 				h: KEEP.h,
 				cx: q.cx,
@@ -95,14 +99,17 @@ export const KeepsakePrint: React.FC<{t: number}> = ({t}) => {
 				seed: 49,
 				speckle: 0.4,
 				plates: [
-					{ch: 1, ink: INK.heat, angle: 15, cell: 6, dx: 1.5, dy: -1, gain: 0.95},
-					{ch: 0, ink: INK.key, angle: 45, cell: 6, gain: 0.85, gamma: 1.2},
+					// tuned on P49 (zoomed f6044): the heat plate opened up (gamma 0.8) and pushed on Maya's face
+					{ch: 1, ink: INK.heat, angle: 15, cell: 6, dx: 1.5, dy: -1, gain: 0.95, gamma: 0.8, mask: faceBoost},
+					{ch: 0, ink: INK.key, angle: 45, cell: 6, gain: 0.88},
 				],
 			}
 		: null;
-	// the pencil: one beat to go round, closing on 108.3, then a flick past the start
-	const {d: path, closeAt} = ringPath(ring, KEEP.w, KEEP.h);
-	const draw = t < CLOSE ? closeAt * easeInOut((t - PENCIL) / (CLOSE - PENCIL)) : lerp(closeAt, 1, easeOut((t - CLOSE) / 0.12));
+	// the pencil: one beat to go round, closing on 108.3, then a flick past the start. A hand starts fast: a fifth of
+	// the loop is already down on 108.2's own frame
+	const {d: path, closeAt} = ringPath(P49_MAYA, KEEP.w, KEEP.h);
+	const go = clamp01((t - PENCIL + LEAD) / (CLOSE - PENCIL + LEAD));
+	const draw = t < CLOSE ? closeAt * (1 - Math.pow(1 - go, 1.6)) : lerp(closeAt, 1, easeOut((t - CLOSE) / 0.12));
 	const wob = (i: number) => (hash2(i, 3, 49) - 0.5) * 1.2;
 	return (
 		<>
@@ -123,7 +130,7 @@ export const KeepsakePrint: React.FC<{t: number}> = ({t}) => {
 				</div>
 			</div>
 			{sheet && <Press sheets={[sheet]} />}
-			{t >= PENCIL && draw > 0 && (
+			{t >= PENCIL - LEAD && draw > 0 && (
 				<div
 					style={{
 						position: 'absolute',

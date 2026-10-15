@@ -14,9 +14,10 @@ import {CamLayer, Paper, Press, SheetCanvas} from './Press';
 //   black; a page turn lands P36 (the five walking home) across the spread.
 // Hoist: the same lyric goes public as fly-posters on a pale wall, the type going from black to orange as she comes
 //   alive. P37 (Dev, arms down) with a FLATLINE snipe, MY HEART / STOPPED stamped black on the wall (its heat beats
-//   once more off register), P38 (Jess, arms out), P39 (Kai, arms rising) with an AND I STARTED
-//   snipe, then P40 (Maya, arms fully up) hoisted through the swell with her plates drifting out of register, a
-//   DANCING snipe, and the snap into register on the final-drop downbeat.
+//   once more off register), P38 (Jess, arms out), MY HEART throbbing in heat (the heart restarting), P39 (Kai, arms
+//   rising) with an AND I STARTED snipe, then P40 (Maya, arms fully up) hoisted through the swell with her key plate
+//   drifting out of register, a DANCING snipe, a cut in to her face on the swell's last beat, and the snap into
+//   register on the final-drop downbeat.
 
 /* ----------------------------------------------------------------------------------------------------- */
 /* photos                                                                                                */
@@ -25,26 +26,28 @@ type Photo = {map: string; crop: [number, number, number, number]};
 
 /**
  * Crops (image fractions u0, v0, u1, v1 of the 2752x1536 still), each matched to the aspect of the box it prints in.
- * P34, P36 and P37 were read off gridded copies of the real photos. P35, P38, P39 and P40 do not exist yet:
- * PROVISIONAL until each photo exists, set from its prompt (centred subject).
+ * All seven were read off gridded copies of the real photos. P37 to P40 share one pale wall whose left edge (the
+ * dark street beyond it) slants from u 0.335 at the top to u 0.35 at the bottom: the wall posters' crops start at or
+ * just past it, or the street prints as a solid black bar down the poster's left side.
  */
 const PHOTOS: Record<string, Photo> = {
 	// her profile (u 0.50-0.69, eye at u 0.65 v 0.36) at the middle, facing the fold; the bottom stops at v 0.92,
 	// above the phone's glow (u 0.82-0.92, v 0.92-1), which printed as a hole in the corner
 	P34: {map: 'P34', crop: [0.345, 0, 0.873, 0.92]},
-	P35: {map: 'P35', crop: [0.213, 0, 0.787, 1]}, // PROVISIONAL until P35 exists
+	// her face (u 0.47-0.62, v 0.2-0.6) a little right of centre, turned toward the fold; the streetlight top left
+	P35: {map: 'P35', crop: [0.213, 0, 0.787, 1]},
 	// the gutter (the crop's centre, u 0.4725) falls in the gap between Kai (right edge u 0.445) and Sam's shoe (u 0.50)
 	P36: {map: 'P36', crop: [0, 0.019, 0.945, 0.981]},
 	// Dev (u 0.40-0.62) on the pale wall; the crop starts clear of the wall's dark left edge (u 0.335-0.34)
 	P37: {map: 'P37', crop: [0.347, 0, 0.7365, 1]},
-	P38: {map: 'P38', crop: [0.305, 0, 0.6945, 1]}, // PROVISIONAL until P38 exists
-	P39: {map: 'P39', crop: [0.305, 0, 0.6945, 1]}, // PROVISIONAL until P39 exists
-	P40: {map: 'P40', crop: [0.305, 0, 0.6945, 1]}, // PROVISIONAL until P40 exists
+	// Jess: her raised hand (u 0.347-0.38) stays in, the sleeve beyond the wall is trimmed; her other hand ends u 0.715
+	P38: {map: 'P38', crop: [0.345, 0, 0.7344, 1]},
+	// Kai (u 0.36-0.65, arms up, face u 0.52 v 0.3), cropped like P37
+	P39: {map: 'P39', crop: [0.347, 0, 0.7364, 1]},
+	// Maya, arms up: hands v 0.105-0.21, face u 0.475-0.535 v 0.37-0.48, elbows u 0.325 (trimmed to the wall) and 0.70
+	P40: {map: 'P40', crop: [0.34, 0, 0.7293, 1]},
 };
-
-/** Dev only: stand-ins for photos that don't exist yet (src/print/dev/diptych.ts fills it). Empty in the film. */
-export const STANDINS: Record<string, Photo> = {};
-const photo = (id: string): Photo => STANDINS[id] ?? PHOTOS[id];
+const photo = (id: string): Photo => PHOTOS[id];
 
 /* ----------------------------------------------------------------------------------------------------- */
 /* shared                                                                                                */
@@ -231,12 +234,17 @@ const Z = {
 	rule: bt(93, 4), // 174.184 the flat rule draws under it to the fold
 	dots: [bt(94), bt(94, 2), bt(94, 3)], // 174.626, 175.078, 175.543
 	orange: bt(95), // 176.448 P35 orange pull, 'and I started'
+	blackWait: bt(95, 2), // 176.924 the black squeegee drops onto the screen
 	black: bt(95, 3), // 177.377 black pull, 'dancing'
 	turn: bt(96), // 178.283 page turn lands: P36 across the spread, orange
+	black2Wait: bt(96, 2), // 178.736 the black squeegee drops onto the spread
 	black2: bt(96, 3), // 179.188 black pull
 };
 const PULL = 0.22;
-const POISE = 56; // where a squeegee waits, on the top margin
+const POISE = 56; // where the orange squeegee waits, on the top margin (the 94.4 framing shows it)
+// where a black squeegee waits: lower, resting on the screen over the print's top edge, so the pushes on 95.2 and
+// 96.2 (framed tighter and lower than 94.4) still show the blade waiting
+const POISE_K = 136;
 const TURN = 6 / 30; // the page turns in 6 frames and lands on the downbeat
 
 const ZINE_MOVES: Move[] = [
@@ -248,12 +256,12 @@ const ZINE_MOVES: Move[] = [
 	{t: Z.dots[2], to: pose(1045, 608, 1.52), dur: 0.12},
 	{t: bt(94, 4), to: pose(1330, 470, 1.18), dur: 0.2}, // the blank right page, the squeegee poised
 	{t: Z.orange, to: pose(1390, 520, 1.24), dur: 0.14},
-	{t: bt(95, 2), to: pose(1390, 520, 1.3), dur: 0.3},
+	{t: bt(95, 2), to: pose(1390, 505, 1.3), dur: 0.3}, // a push, the black blade waiting at the top
 	{t: Z.black, to: pose(960, 540, 1), dur: 0.16}, // wide: before and after, side by side
 	{t: bt(95, 4), to: pose(960, 536, 1.045), dur: 0.3},
 	{t: Z.turn - TURN, to: pose(960, 540, 1.01), dur: 0.2},
 	{t: Z.turn, to: pose(960, 540, 1), dur: 0.1},
-	{t: bt(96, 2), to: pose(1010, 560, 1.09), dur: 0.2},
+	{t: bt(96, 2), to: pose(1010, 535, 1.09), dur: 0.2}, // a push, the black blade waiting across the spread
 	{t: Z.black2, to: pose(1010, 556, 1.12), dur: 0.3},
 	{t: bt(96, 4), to: pose(1180, 420, 1.36), dur: 0.18}, // in on their heads (Sam laughing on Dev's back, Maya at the right), into the cut
 ];
@@ -403,10 +411,10 @@ export const Diptych: React.FC<{t: number}> = ({t}) => {
 	const k36 = pullAt(t, Z.black2, 0.26);
 	const rTop = SPREAD.y;
 	const pageH = SPREAD.h;
-	const sqY = (k: number) => POISE + k * (rTop + pageH + 40 - POISE); // the blade's world y
-	const imgPull = (k: number, top: number, h: number) => (k <= 0 ? 0 : clamp01((sqY(k) - top) / h));
-	const oPull35 = imgPull(o35.k, RIGHT_IMG.y, IMG_H);
-	const kPull35 = imgPull(k35.k, RIGHT_IMG.y, IMG_H);
+	const sqY = (k: number, y0: number) => y0 + k * (rTop + pageH + 40 - y0); // the blade's world y, from where it waited
+	const imgPull = (k: number, y0: number, top: number, h: number) => (k <= 0 ? 0 : clamp01((sqY(k, y0) - top) / h));
+	const oPull35 = imgPull(o35.k, POISE, RIGHT_IMG.y, IMG_H);
+	const kPull35 = imgPull(k35.k, POISE_K, RIGHT_IMG.y, IMG_H);
 
 	const sheets: Sheet[] = [];
 	if (d) {
@@ -441,7 +449,7 @@ export const Diptych: React.FC<{t: number}> = ({t}) => {
 				});
 			}
 		} else {
-			sheets.push({map: d[p36.map], crop: p36.crop, w: SPREAD.w, h: SPREAD.h, ...place(960, 540), seed: 36, plates: p36Plates(t, imgPull(k36.k, SPREAD.y, SPREAD.h))});
+			sheets.push({map: d[p36.map], crop: p36.crop, w: SPREAD.w, h: SPREAD.h, ...place(960, 540), seed: 36, plates: p36Plates(t, imgPull(k36.k, POISE_K, SPREAD.y, SPREAD.h))});
 		}
 	}
 
@@ -455,7 +463,7 @@ export const Diptych: React.FC<{t: number}> = ({t}) => {
 	const spreadT = `translate(960px, 540px) scale(${S}) translate(-960px, -540px)`;
 
 	// captions on the right page are printed by the squeegee: revealed above the blade only
-	const revealY = (k: number) => (k <= 0 ? -1e4 : sqY(k));
+	const revealY = (k: number, y0: number) => (k <= 0 ? -1e4 : sqY(k, y0));
 	const clipAbove = (y: number): React.CSSProperties => ({clipPath: `inset(0 0 ${Math.max(0, 3000 - y)}px 0)`});
 
 	return (
@@ -497,7 +505,7 @@ export const Diptych: React.FC<{t: number}> = ({t}) => {
 							)}
 							{/* the right page's words, printed by the two pulls */}
 							{!turning && o35.k > 0 && (
-								<div style={{position: 'absolute', inset: 0, ...clipAbove(revealY(o35.k))}}>
+								<div style={{position: 'absolute', inset: 0, ...clipAbove(revealY(o35.k, POISE))}}>
 									<WorldSvg box={[0, 0, 1920, 1080]} style={inked(700, 31, 2)}>
 										<text x={STARTED_X} y={CAP1} fontFamily={SERIF} fontStyle="italic" fontSize={CAP_SIZE} fill={INK.heat}>
 											and I started
@@ -506,7 +514,7 @@ export const Diptych: React.FC<{t: number}> = ({t}) => {
 								</div>
 							)}
 							{!turning && k35.k > 0 && (
-								<div style={{position: 'absolute', inset: 0, ...clipAbove(revealY(k35.k))}}>
+								<div style={{position: 'absolute', inset: 0, ...clipAbove(revealY(k35.k, POISE_K))}}>
 									<WorldSvg box={[0, 0, 1920, 1080]} style={inked(700, 5, 19)}>
 										<text x={RIGHT_IMG.x} y={CAP2} fontFamily={SERIF} fontStyle="italic" fontSize={140} fill={INK.key}>
 											dancing
@@ -593,11 +601,12 @@ export const Diptych: React.FC<{t: number}> = ({t}) => {
 				{/* the squeegees */}
 				<div style={{position: 'absolute', left: 0, top: 0, width: 1920, height: 3000, transformOrigin: '0 0', transform: spreadT}}>
 					{t >= at(bt(94, 4)) && t < at(Z.orange) && <Squeegee x={GUT + 22} y={POISE - 90 * (1 - easeOut((t - at(bt(94, 4))) / 0.15))} w={SPREAD.w / 2 - 44} ink={INK.heat} />}
-					{o35.on && <Squeegee x={GUT + 22} y={sqY(o35.k) + 400 * o35.exit} w={SPREAD.w / 2 - 44} ink={INK.heat} />}
-					{t >= bt(95, 2) + 0.2 && t < at(Z.black) && <Squeegee x={GUT + 22} y={POISE - 90 * (1 - easeOut((t - bt(95, 2) - 0.2) / 0.12))} w={SPREAD.w / 2 - 44} ink={INK.key} />}
-					{t >= bt(96, 2) + 0.2 && t < at(Z.black2) && <Squeegee x={SPREAD.x + 20} y={POISE - 90 * (1 - easeOut((t - bt(96, 2) - 0.2) / 0.12))} w={SPREAD.w - 40} ink={INK.key} />}
-					{k35.on && <Squeegee x={GUT + 22} y={sqY(k35.k) + 400 * k35.exit} w={SPREAD.w / 2 - 44} ink={INK.key} />}
-					{k36.on && <Squeegee x={SPREAD.x + 20} y={sqY(k36.k) + 400 * k36.exit} w={SPREAD.w - 40} ink={INK.key} />}
+					{o35.on && <Squeegee x={GUT + 22} y={sqY(o35.k, POISE) + 400 * o35.exit} w={SPREAD.w / 2 - 44} ink={INK.heat} />}
+					{/* 95.2 and 96.2: the black squeegee drops onto the screen on the beat and waits for the pull */}
+					{t >= at(Z.blackWait) && t < at(Z.black) && <Squeegee x={GUT + 22} y={POISE_K - 120 * (1 - easeOut((t - at(Z.blackWait)) / 0.1))} w={SPREAD.w / 2 - 44} ink={INK.key} />}
+					{t >= at(Z.black2Wait) && t < at(Z.black2) && <Squeegee x={SPREAD.x + 20} y={POISE_K - 120 * (1 - easeOut((t - at(Z.black2Wait)) / 0.1))} w={SPREAD.w - 40} ink={INK.key} />}
+					{k35.on && <Squeegee x={GUT + 22} y={sqY(k35.k, POISE_K) + 400 * k35.exit} w={SPREAD.w / 2 - 44} ink={INK.key} />}
+					{k36.on && <Squeegee x={SPREAD.x + 20} y={sqY(k36.k, POISE_K) + 400 * k36.exit} w={SPREAD.w - 40} ink={INK.key} />}
 				</div>
 			</CamLayer>
 		</AbsoluteFill>
@@ -631,17 +640,20 @@ const WALL: Poster[] = [
 	{id: 'P39', cx: 2700, cy: 545, rot: -1.0, t0: H.started, label: '03/04 · KAI · 3:03 AM · ARMS UP'},
 ];
 const HERO = {id: 'P40', cx: 3560, w: 680, h: 975, cy: 515}; // Maya, hoisted; cy is where she ends up
+// her poster is the finer print (the others are 7.5): her face is ~96 px wide on it, 17 dots instead of 13, so it
+// still reads as a face through the push to 1.2 and the drift
+const HERO_CELL = 5.5;
 
 /** World point of image fraction (u, v) of a photo printed in a box of w x h centred on (cx, cy). */
 const inBox = (id: string, u: number, v: number, cx: number, cy: number, w: number, h: number): [number, number] => {
 	const [u0, v0, u1, v1] = PHOTOS[id].crop;
 	return [cx - w / 2 + ((u - u0) / (u1 - u0)) * w, cy - h / 2 + ((v - v0) / (v1 - v0)) * h];
 };
-// Dev's face in P37 (u 0.50, v 0.29, read off the photo); Jess's and Maya's from their prompts (centred, knees up)
+// Faces read off the photos: Dev's in P37 (u 0.50, v 0.29), Jess's in P38 (u 0.505, v 0.31; eyes v 0.29), Maya's in
+// P40 (u 0.505, v 0.37-0.48, centre 0.43; eyes v 0.415; her hands v 0.105-0.21)
 const DEV_FACE = inBox('P37', 0.5, 0.29, 360, 530, 600, 860);
-const JESS_FACE = inBox('P38', 0.5, 0.25, 2060, 520, 600, 860); // PROVISIONAL until P38 exists
-// knees up with her arms fully up and her hands just under the top edge (the prompt): her face near v 0.27
-const MAYA_FACE = inBox('P40', 0.5, 0.27, 3560, 515, 680, 975); // PROVISIONAL until P40 exists
+const JESS_FACE = inBox('P38', 0.505, 0.31, 2060, 520, 600, 860);
+const MAYA_FACE = inBox('P40', 0.505, 0.43, 3560, 515, 680, 975);
 
 /** The heart block on the wall, both lines set to the same measure (MY HEART 3.695 em, STOPPED 3.192 em). */
 const MH = {x: 880, w: 836, base1: 352};
@@ -657,18 +669,21 @@ const HOIST_MOVES: Move[] = [
 	{t: H.heart, to: pose(880, 490, 1), dur: 0.05}, // cut: Dev at the left, the heart block
 	{t: bt(97, 4), to: pose(895, 485, 1.03), dur: 0.3},
 	{t: H.p38, to: pose(1820, 520, 1), dur: 0.08}, // whip right: the heart block and Jess
-	{t: bt(98, 2), to: pose(JESS_FACE[0], JESS_FACE[1] + 70, 2), dur: 0.06}, // punch in: Jess
+	{t: bt(98, 2), to: pose(JESS_FACE[0], JESS_FACE[1] + 40, 2.3), dur: 0.06}, // punch in: Jess, her face and both hands
 	{t: H.kick, to: pose(1210, 520, 0.8), dur: 0.08}, // the register kick: wide, the wall so far
-	{t: bt(98, 4), to: pose(1225, 520, 0.82), dur: 0.3},
+	{t: bt(98, 4), to: pose(MH.x + MH.w / 2, 392, 1.12), dur: 0.1}, // push in on the heart block: it beats again, in heat
+	{t: bt(98, 4) + 0.12, to: pose(MH.x + MH.w / 2 + 12, 388, 1.16), dur: 0.33},
 	{t: H.started, to: pose(3050, 590, 1), dur: 0.08}, // Kai and AND I STARTED; Maya's poster comes up from below
 	{t: H.steps[0], to: pose(3075, 570, 1), dur: 0.2},
 	{t: H.steps[1], to: pose(3100, 555, 1), dur: 0.2},
 	{t: H.steps[2], to: pose(3120, 545, 1), dur: 0.2},
 	{t: H.dancing, to: pose(3140, 525, 0.96), dur: 0.08}, // AND I STARTED / DANCING on one line
 	// the swell: a push a beat into her, the plates sliding further apart
-	{t: bt(100, 2), to: pose(3300, 470, 1.1), dur: 0.12},
-	{t: H.widest, to: pose(3470, 480, 1.25), dur: 0.12}, // her and DANCING, the plates furthest apart
-	{t: bt(100, 4), to: pose(MAYA_FACE[0], MAYA_FACE[1], 2.05), dur: 0.1}, // the last beat of the swell: tight on her face and arms
+	{t: bt(100, 2), to: pose(3300, 500, 1.1), dur: 0.12},
+	{t: H.widest, to: pose(3470, 532, 1.2), dur: 0.12}, // her hands to DANCING, the plates furthest apart
+	// the last beat of the swell: cut in to her face (15% of the frame), eyes high, her arms going up out of frame
+	{t: bt(100, 4), to: pose(MAYA_FACE[0] + 18, MAYA_FACE[1] + 25, 3), dur: 0.03},
+	{t: bt(100, 4) + 0.04, to: pose(MAYA_FACE[0] + 22, MAYA_FACE[1] + 22, 3.07), dur: 0.42},
 	{t: H.snap, to: pose(3480, 525, 1), dur: 0.05}, // the drop: out to the whole poster, in register, taped up
 ];
 
@@ -705,14 +720,16 @@ const heroY = (t: number) => {
 /** How far Maya's plates are out of register (screen px), stepping up through the swell; 0 from the drop. */
 const DRIFT: [number, number][] = [
 	[H.started, 6],
-	[H.steps[0], 11],
-	[H.steps[1], 16],
-	[H.steps[2], 21],
-	[H.dancing, 25],
-	[bt(100, 2), 28],
-	[H.widest, 34],
-	[bt(100, 4), 31],
+	[H.steps[0], 10],
+	[H.steps[1], 14],
+	[H.steps[2], 18],
+	[H.dancing, 21],
+	[bt(100, 2), 24],
+	[H.widest, 29],
+	[bt(100, 4), 18],
 ];
+/** The close-up's drift, from its first frame: a fringe on her hair and sleeves, about a dot and a half. */
+const CLOSE_DRIFT = 18;
 const driftAt = (t: number) => {
 	if (t >= H.snap) return 0;
 	let v = 0;
@@ -829,12 +846,18 @@ const PosterPaper: React.FC<{cx: number; cy: number; w: number; h: number; rot: 
 	);
 };
 
-const posterPlates = (t: number, seed: number, kick: number, drift = 0): Plate[] => {
+/**
+ * A poster's two plates. `close`: the close-up on 100.4, printed finer (about the dot size on screen of the wide frames,
+ * so her face is ~25 dots across), its heat pushed up a little so the shading of her closed eyes and mouth reads.
+ */
+const posterPlates = (t: number, seed: number, kick: number, drift = 0, cell = 7.5, close = false): Plate[] => {
 	const [hx, hy] = kickNudge(t, 1 + seed, 2.5);
 	const [kx, ky] = kickNudge(t, seed, 1.5);
 	return [
-		{ch: 1, ink: INK.heat, angle: 15, cell: 7.5, dx: 2 + hx + 15 * kick + 0.7 * drift, dy: -1 + hy - 9 * kick - drift},
-		{ch: 0, ink: INK.key, angle: 45, cell: 7.5, gain: 0.85, gamma: 1.25, dx: kx - 8 * kick - 0.2 * drift, dy: ky + 5 * kick + 0.15 * drift},
+		{ch: 1, ink: INK.heat, angle: 15, cell, gain: close ? 1.2 : 1, gamma: close ? 0.9 : 1, dx: 2 + hx + 15 * kick, dy: -1 + hy - 9 * kick},
+		// the drift moves the key alone, mostly sideways: hair and sleeves fringe in orange while the faces, whose
+		// shading is all in the heat, stay whole (moving the heat instead slid her face off its own eyes and mouth)
+		{ch: 0, ink: INK.key, angle: 45, cell, gain: 0.85, gamma: 1.25, dx: kx - 8 * kick - drift, dy: ky + 5 * kick + 0.2 * drift},
 	];
 };
 
@@ -842,7 +865,9 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P37', 'P38', 'P39', 'P40'].map((id) => photo(id).map));
 	const cam = hoistCam(t);
 	const kick = t >= H.kick ? Math.exp(-(t - H.kick) / 0.14) : 0;
-	const drift = driftAt(t);
+	// the close-up on 100.4, a hard cut in, until the drop's snap (t equals at(c) on the frame before a cue's frame)
+	const close = t > at(bt(100, 4)) && t <= at(H.snap);
+	const drift = close ? CLOSE_DRIFT : driftAt(t);
 
 	// the wall posters
 	const live = WALL.filter((p) => t >= p.t0);
@@ -863,7 +888,7 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 	const heroS = pasted ? pasted.s : 1;
 	const p40 = photo(HERO.id);
 	const heroSheet: Sheet | null =
-		d && heroOn ? {map: d[p40.map], crop: p40.crop, w: HERO.w, h: HERO.h, cx: HERO.cx, cy: hy, s: heroS, rot: sway, seed: 40, plates: posterPlates(t, 9, kick * 0.6, drift)} : null;
+		d && heroOn ? {map: d[p40.map], crop: p40.crop, w: HERO.w, h: HERO.h, cx: HERO.cx, cy: hy, s: heroS, rot: sway, seed: 40, plates: posterPlates(t, 9, kick * 0.6, drift, close ? 3.8 : HERO_CELL, close)} : null;
 	const heroShadow = pasted ? pasted.shadow : `0 34px 60px rgba(45,30,15,0.42)`;
 
 	// type
@@ -872,6 +897,11 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 	// STOPPED is black (the heart has stopped); its heat beats once more off register on 97.4, and again on the kick
 	const ghostAt = (b: number, until: number) => (t >= b && t < until ? Math.exp(-(t - b) / 0.13) : 0);
 	const ghost = Math.max(ghostAt(bt(97, 4), H.p38), ghostAt(H.kick, H.started));
+	// 98.4: the heart starts again before the words say so. MY HEART overprints in heat, off register, and throbs
+	// twice (ba-dum), a beat ahead of AND I STARTED
+	const beatK = (b: number) => (t >= b ? Math.exp(-(t - b) / 0.08) : 0);
+	const restart = t > at(bt(98, 4)) && t < H.started;
+	const thump = restart ? Math.max(beatK(at(bt(98, 4))), 0.7 * beatK(at(bt(98, 4)) + 0.17)) : 0;
 	const startedSt = stamp(t, H.started);
 	const dancingSt = stamp(t, H.dancing);
 	const rot40 = (sway * Math.PI) / 180;
@@ -909,10 +939,17 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 				{/* MY HEART / STOPPED, stamped straight onto the wall */}
 				{heartSt.on && (
 					<WorldSvg box={[780, 0, 1100, 800]} style={inked(900, 9, 4, true)}>
-						<g transform={about(MH.x, MH.base1, heartSt.s)}>
+						<g transform={about(MH.x + MH.w / 2, MH.base1, heartSt.s * (1 + 0.035 * thump))}>
 							<text x={MH.x} y={MH.base1} fontFamily="Anton" fontSize={MH_S1} fill={INK.key}>
 								MY HEART
 							</text>
+							{restart && (
+								<g style={{mixBlendMode: 'multiply'}}>
+									<text x={MH.x + 13 + 9 * thump} y={MH.base1 - 8 - 6 * thump} fontFamily="Anton" fontSize={MH_S1} fill={INK.heat}>
+										MY HEART
+									</text>
+								</g>
+							)}
 						</g>
 						<g transform={about(MH.x, MH_BASE2, heartSt.s)}>
 							<text x={MH.x} y={MH_BASE2} fontFamily="Anton" fontSize={MH_S2} fill={INK.key}>

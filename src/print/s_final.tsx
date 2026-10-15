@@ -4,7 +4,7 @@ import {F} from '../full/cues';
 import {BEATS, bt, lastBeatIndex} from '../timing';
 import {Density, useDensities} from './density';
 import {hash2, INK, SERIF} from './ink';
-import {clamp01, CropMarks, easeInOut, easeOut, inked, kickNudge, lerp, RegTarget, Rule, Slug, stamp} from './kit';
+import {clamp01, CropMarks, easeOut, inked, kickNudge, lerp, RegTarget, Rule, Slug, stamp} from './kit';
 import {Cam, Plate, plateDots, Sheet, sheetMatrix} from './press';
 import {CamLayer, Paper, Press} from './Press';
 import {KeepsakePrint} from './s_keepsake';
@@ -36,17 +36,19 @@ const lerpPose = (a: Pose, b: Pose, k: number): Pose => ({
 	rot: lerp(a.rot, b.rot, k),
 });
 
-/** Short, fast camera moves, each starting on its beat from wherever the last one had got to. */
+/** Short, fast camera moves, each starting on its beat (LEAD early, so it shows on the beat's frame) from wherever
+ *  the last one had got to. */
 const track = (t: number, moves: Move[]): Pose => {
 	let from = moves[0].to;
 	let to = moves[0].to;
 	let t0 = -1e9;
 	let dur = 1;
 	for (const m of moves.slice(1)) {
-		if (m.t > t) break;
-		from = lerpPose(from, to, easeOut((m.t - t0) / dur));
+		const start = m.t - LEAD;
+		if (start > t) break;
+		from = lerpPose(from, to, easeOut((start - t0) / dur));
 		to = m.to;
-		t0 = m.t;
+		t0 = start;
 		dur = m.dur;
 	}
 	return lerpPose(from, to, easeOut((t - t0) / dur));
@@ -88,25 +90,25 @@ type MacroDef = {
 	hGain?: number;
 	hGamma?: number;
 	throwDir: [number, number]; // the heat plate is flung this way on the hit and snaps back into register
-	whip?: boolean; // ease in-out (a whip from one detail to the next) instead of a push that settles
 };
 
 // Crops read off gridded copies of P41-P43 (scratchpad/build/final/g_P4*.png).
 const MACROS: MacroDef[] = [
 	// Jess: face u 0.29-0.50, v 0.27-0.72; her hoop at the left edge of the crop
 	{id: 'P41', t0: bt(101, 2), label: 'JESS', a: [0.395, 0.475, 0.52], b: [0.4, 0.46, 0.45], cell: 30, kGain: 0.95, hGain: 1.2, throwDir: [1, -0.6]},
-	// Kai's open overshirt flung out like a wing (sleeve from u 0.14 to the shoulder, the panel hanging to v 0.9): key alone
-	// on orange stock, the key plate's midtones held back (gamma 1.5) so the people behind drop out and the wing stays solid
-	{id: 'P42', t0: bt(101, 3), label: 'THE WING', a: [0.3, 0.56, 0.6], b: [0.25, 0.5, 0.53], cell: 32, stock: INK.heat, kGain: 1.1, kGamma: 1.5, throwDir: [0, 0]},
+	// Kai's open overshirt flung out like a wing (sleeve from u 0.14 to the shoulder, the panel hanging to v 0.9), with his
+	// black hair (u 0.43-0.61, v 0.10-0.30) kept as an arch at the top so the shape reads as a figure in a garment: key
+	// alone on orange stock, midtones held back (gamma 1.3) so the people behind drop out and the wing stays solid
+	{id: 'P42', t0: bt(101, 3), label: 'THE WING', a: [0.38, 0.39, 0.62], b: [0.35, 0.405, 0.55], cell: 32, stock: INK.heat, kGain: 1.1, kGamma: 1.3, throwDir: [0, 0]},
 	// Maya's hair flying up, her face in it
 	{id: 'P43', t0: bt(101, 4), label: 'MAYA', a: [0.36, 0.31, 0.46], b: [0.355, 0.27, 0.41], cell: 30, kGain: 1.0, hGain: 1.3, hGamma: 0.85, throwDir: [-1, 0.5]},
 	// Dev: face u 0.52-0.72, v 0.2-0.72, laughing with his eyes shut (key alone on orange)
 	{id: 'P41', t0: bt(102), label: 'DEV', a: [0.6, 0.45, 0.5], b: [0.615, 0.43, 0.44], cell: 30, stock: INK.heat, kGain: 1.3, kGamma: 0.85, throwDir: [0, 0]},
 	// Kai's shouting face: fringe to chin u 0.44-0.61, v 0.09-0.47
 	{id: 'P42', t0: bt(102, 2), label: 'KAI', a: [0.52, 0.3, 0.46], b: [0.522, 0.29, 0.37], cell: 28, kGain: 1.1, hGain: 1.2, throwDir: [0.8, 0.8]},
-	// the clasped hands (u 0.5, v 0.82, between Maya's black sleeve and Sam's denim one), whipping up to Sam's auburn
-	// curls (orange ink) and her laughing face: at cell 30 the hands only read in motion, so the held image is Sam
-	{id: 'P43', t0: bt(102, 3), label: 'THE HANDS AND SAM', a: [0.505, 0.8, 0.34], b: [0.69, 0.33, 0.48], cell: 30, kGain: 0.9, hGain: 1.8, throwDir: [0, 0], whip: true},
+	// Sam's laughing face (u 0.65-0.75, v 0.25-0.45) in her flying auburn curls (u 0.55-0.9, v 0-0.55, orange ink), pushing
+	// in. The clasped hands (u 0.5, v 0.82) are dropped: at cell 28-32 they print as shapeless dark masses
+	{id: 'P43', t0: bt(102, 3), label: 'SAM', a: [0.695, 0.31, 0.48], b: [0.69, 0.335, 0.39], cell: 30, kGain: 0.9, hGain: 1.8, throwDir: [-0.8, 0.6]},
 	// Jess's gold hoop (a ring of bare orange stock) and her cheek: key alone
 	{id: 'P41', t0: bt(102, 4), label: 'THE HOOP', a: [0.315, 0.575, 0.33], b: [0.33, 0.56, 0.26], cell: 28, stock: INK.heat, kGain: 1.15, kGamma: 0.9, throwDir: [0, 0]},
 ];
@@ -115,7 +117,7 @@ const MACRO_END = bt(103);
 const macroSheet = (m: MacroDef, t: number, t1: number, map: Density, n: number): Sheet => {
 	const dur = t1 - m.t0;
 	const x = (t - m.t0) / dur;
-	const k = m.whip ? easeInOut(clamp01((x - 0.1) / 0.42)) : easeOut(x);
+	const k = easeOut(x);
 	const [u0, v0, z0] = m.a;
 	const [u1, v1, z1] = m.b;
 	const u = lerp(u0, u1, k);
@@ -191,15 +193,17 @@ const B = {
 	last: bt(108, 4),
 };
 
-/** The black squeegee: three strokes on the beats, then a last drag that stops dead on 'Still'. */
+/** The black squeegee: three strokes on the beats (each already moving on its beat's frame), then a last drag that
+ *  stops dead on 'Still'. */
+const SQ_IN = B.sq - LEAD;
 const squeegee = (t: number): number => {
-	if (t < B.sq) return 0;
+	if (t < SQ_IN) return 0;
 	const tt = Math.min(t, B.still);
 	const strokes: [number, number, number][] = [
-		// beat, where the stroke lands, where it has crept to by the next beat (fractions of STOP)
-		[B.sq, 0.31, 0.35],
-		[B.step1, 0.6, 0.64],
-		[B.step2, 0.87, 0.87],
+		// stroke start, where the stroke lands, where it has crept to by the next stroke (fractions of STOP)
+		[SQ_IN, 0.31, 0.35],
+		[B.step1 - LEAD, 0.6, 0.64],
+		[B.step2 - LEAD, 0.87, 0.87],
 	];
 	let from = 0;
 	let x = 0;
@@ -211,7 +215,9 @@ const squeegee = (t: number): number => {
 		x = lerp(from, land, k) + (creep - land) * clamp01((tt - b - 0.15) / (next - b - 0.15));
 		from = creep;
 	}
-	if (tt >= B.step2) x = lerp(0.87, 1, Math.pow(clamp01((tt - B.step2 - 0.15) / (B.still - B.step2 - 0.15)), 1.6));
+	// after the third stroke lands, the blade drags the last stretch and stops dead on 'Still'
+	const s3 = strokes[2][0] + 0.15;
+	if (tt >= s3) x += 0.13 * Math.pow(clamp01((tt - s3) / (B.still - s3)), 1.6);
 	return x * STOP;
 };
 
@@ -223,11 +229,13 @@ const p44Plates = (t: number, full = false): Plate[] => {
 	const [ox, oy] = frozen || full ? [0, 0] : kickNudge(t, 1, amp);
 	const [kx, ky] = frozen || full ? [0, 0] : kickNudge(t, 0, amp * 0.5);
 	const cPull = full ? 2 : clamp01((t - B.cold + 0.05) / 0.26) * 1.02; // already a quarter across on the beat's frame
-	const hPull = full ? 2 : t < B.heat ? 0 : STOP * easeOut((t - B.heat) / 0.26);
+	const hPull = full ? 2 : t < B.heat - LEAD ? 0 : STOP * easeOut((t - B.heat + LEAD) / 0.26);
+	// Maya's side keeps a half-weight cold plate (the downbeat lands on ink, not bare paper) until the orange reaches it;
+	// behind the orange's edge it drops to the shadows only, or the overprint goes to mud
+	const behind = (u: number) => (hPull >= STOP ? 1 : clamp01((hPull - u) / 0.03));
 	const kPull = full ? 2 : squeegee(t);
 	return [
-		// where the warm plates land, the cold plate keeps only the shadows (or the overprint goes to mud)
-		{ch: 2, ink: INK.cold, angle: 75, cell: 8.5, kind: full ? 'dot' : 'line', pull: cPull, dx: 2 + bx, dy: 1 + by, gain: 0.86, gamma: 1.2, mask: (u) => (u < STOP ? 0.2 : 1)},
+		{ch: 2, ink: INK.cold, angle: 75, cell: 8.5, kind: full ? 'dot' : 'line', pull: cPull, dx: 2 + bx, dy: 1 + by, gain: 0.86, gamma: 1.2, mask: (u) => (u < STOP ? lerp(0.5, 0.2, behind(u)) : 1)},
 		{ch: 1, ink: INK.heat, angle: 15, cell: 8.5, pull: hPull, dx: -1 + ox, dy: 2 + oy, gain: 0.95},
 		{ch: 0, ink: INK.key, angle: 45, cell: 8.5, pull: kPull, dx: kx, dy: ky, gain: 0.85, gamma: 1.2},
 	];
@@ -238,9 +246,9 @@ const [MAYA_X, MAYA_Y] = atP44(0.4, 0.4);
 const [KAI_X, KAI_Y] = atP44(0.74, 0.36);
 const STILL_MOVES: Move[] = [
 	{t: -1e9, to: WIDE, dur: 1},
-	{t: B.kick1, to: {cx: MAYA_X - 30, cy: MAYA_Y + 60, s: 1.16, rot: -0.5}, dur: 0.1}, // kick: in on Maya, still cold
+	{t: B.kick1, to: {cx: KAI_X, cy: KAI_Y + 40, s: 1.2, rot: 0.5}, dur: 0.1}, // kick: in on the friends, full blue
 	{t: B.heat, to: {cx: 900, cy: 505, s: 1.0, rot: 0}, dur: 0.12}, // the orange pull: wide again
-	{t: B.kick2, to: {cx: KAI_X, cy: KAI_Y + 40, s: 1.2, rot: 0.5}, dur: 0.1}, // kick: the friends, still only blue
+	{t: B.kick2, to: {cx: MAYA_X - 30, cy: MAYA_Y + 60, s: 1.16, rot: -0.5}, dur: 0.1}, // kick: in on Maya, now in orange
 	{t: B.sq, to: {cx: 640, cy: 530, s: 1.1, rot: 0}, dur: 0.14}, // the squeegee comes in from the left
 	{t: B.step1, to: {cx: 780, cy: 470, s: 1.24, rot: -0.35}, dur: 0.12}, // her face comes up black
 	{t: B.step2, to: {cx: 920, cy: 520, s: 1.1, rot: 0.25}, dur: 0.12},
@@ -267,15 +275,16 @@ const STILL_PATHS = [
 	'M955.8 944V84H1059.4V797.4H1166.1V944Z',
 ];
 const STILL_W = 1122;
-// over the part the warm plates never reached: from just right of the parked blade to inside the sheet's edge
-const STILL_BOX = {x: SX + STOP * P44S.w + 30, w: P44S.w * (1 - STOP) - 30 - 26};
+// over the part the warm plates never reached: clear of the parked blade (its body and highlight reach x + 44, its
+// shadow a little further) to inside the sheet's edge. It stamps from its left edge, so it grows away from the blade.
+const STILL_BOX = {x: SX + STOP * P44S.w + 62, w: P44S.w * (1 - STOP) - 62 - 26};
 const STILL_H = (STILL_BOX.w * 860) / STILL_W;
 const STILL_Y = P44S.cy - STILL_H / 2 + 6;
 
 const StillWord: React.FC<{s: number; style?: React.CSSProperties}> = ({s, style}) => (
 	<svg
 		viewBox={`44 84 ${STILL_W} 860`}
-		style={{position: 'absolute', left: STILL_BOX.x, top: STILL_Y, width: STILL_BOX.w, height: STILL_H, overflow: 'visible', transform: `scale(${s})`, transformOrigin: '50% 60%', mixBlendMode: 'multiply', ...inked(900, 11, 70, true), ...style}}
+		style={{position: 'absolute', left: STILL_BOX.x, top: STILL_Y, width: STILL_BOX.w, height: STILL_H, overflow: 'visible', transform: `scale(${s})`, transformOrigin: '0% 60%', mixBlendMode: 'multiply', ...inked(900, 11, 70, true), ...style}}
 	>
 		{STILL_PATHS.map((p, i) => (
 			<path key={i} d={p} fill={INK.key} />
@@ -313,7 +322,7 @@ export const R9Pull: React.FC<{t: number}> = ({t}) => {
 			<CamLayer cam={cam}>
 				<SheetFurniture t={t} frozen={frozen} />
 				<Rule x={SX + 640} y={SY + P44S.h + 46} w={P44S.w - 640} t={t} freeze={frozen ? B.still : undefined} alive={() => !frozen} amp={24} width={2.8} />
-				{t >= B.sq && <Squeegee x={SX + sq * P44S.w} y={SY} h={P44S.h} />}
+				{t >= SQ_IN && <Squeegee x={SX + sq * P44S.w} y={SY} h={P44S.h} />}
 				{st.on && <StillWord s={st.s} />}
 			</CamLayer>
 		</AbsoluteFill>
@@ -339,11 +348,12 @@ const DH = 860;
 type Imp = {ink: string; dx: number; dy: number};
 type WordKey = {t: number; cx: number; cy: number; w: number; rot: number; key: [number, number] | null; heat: [number, number] | null; move?: number; jump?: boolean; punch: number};
 
-// Where DANCING sits (screen px): huge on the burst, mid-frame while the camera roll is dealt round it, then the top band.
+// Where DANCING sits (screen px): huge on the burst, then in the middle column (x 600 to 1320) while the camera roll
+// is dealt into the side columns round it, then the top band of the same column.
 const W1 = {cx: 960, cy: 512, w: 1680};
-const W2 = {cx: 960, cy: 548, w: 860};
-/** The top band (exported so the keepsake can be checked against it): y 43 to 413. */
-export const W3 = {cx: 960, cy: 228, w: 790};
+const W2 = {cx: 960, cy: 540, w: 720};
+/** The top band (exported so the keepsake can be checked against it): x 590 to 1330, y 50 to 397. */
+export const W3 = {cx: 960, cy: 224, w: 740};
 
 const WORD: WordKey[] = [
 	{t: B.blast, ...W1, rot: 0, key: [0, 0], heat: null, punch: 0.08}, // the loudest beat: stamped in key
@@ -518,16 +528,19 @@ const drawBlast = (ctx: CanvasRenderingContext2D, dots: Dot[], tau: number, cam:
 /* the camera roll ------------------------------------------------------------------------------------ */
 
 type RollDef = {id: string; t0: number; at: [number, number, number]; corner: [number, number, number]; from: [number, number]; cap: string};
-const RW = 576; // image area of a camera-roll print (16:9), screen px
-const RH = 324;
+const RW = 480; // image area of a camera-roll print (16:9), screen px
+const RH = 270;
 const RB = 14; // white border
-const RFOOT = 46;
-// Dealt into the bands above and below the word, never over it; on the jump they are shoved into the corners.
+const RFOOT = 46; // the caption strip: the paper is 508 x 330
+// Dealt into the side columns (paper x 15 to 545 and 1374 to 1905), clear of the word's column whatever its bounce,
+// rotation and key offset, and wholly inside the frame, captions included. On the jump the word rises up its own
+// column and the prints are shoved apart vertically into the corners (still inside the frame); the keepsake lands
+// between the bottom two, over their inner edges.
 const ROLL: RollDef[] = [
-	{id: 'P45', t0: B.p45, at: [700, 922, -3.5], corner: [228, 862, -5], from: [-0.35, 1], cap: '2:04 am, the roof'},
-	{id: 'P46', t0: B.p46, at: [1318, 150, 3.5], corner: [1706, 178, 5.5], from: [0.45, -1], cap: '2:31 am, kitchen'},
-	{id: 'P47', t0: B.p47, at: [1405, 930, 4.5], corner: [1700, 872, 3.5], from: [1, 0.55], cap: '2:48 am, the shop'},
-	{id: 'P48', t0: B.p48, at: [575, 170, -5], corner: [214, 178, -6.5], from: [-1, -0.45], cap: '3:09 am'},
+	{id: 'P45', t0: B.p45, at: [278, 804, -3], corner: [280, 866, -4], from: [-0.5, 1], cap: '2:04 am, the roof'},
+	{id: 'P46', t0: B.p46, at: [1638, 244, 3], corner: [1642, 188, 3.5], from: [0.5, -1], cap: '2:31 am, kitchen'},
+	{id: 'P47', t0: B.p47, at: [1640, 798, 3.5], corner: [1640, 864, 4.5], from: [1, 0.55], cap: '2:48 am, the shop'},
+	{id: 'P48', t0: B.p48, at: [282, 250, -2.5], corner: [278, 186, -3.5], from: [-1, -0.45], cap: '3:09 am'},
 ];
 const SHOVE = 0.2;
 
@@ -581,7 +594,10 @@ const RollPrint: React.FC<{p: RollDef; t: number; map?: Density; n: number}> = (
 					boxShadow: `${4 + 26 * q.air}px ${8 + 40 * q.air}px ${14 + 50 * q.air}px rgba(45,30,15,${0.3 + 0.12 * q.air})`,
 				}}
 			>
-				<div style={{position: 'absolute', left: RB + 2, top: RB + RH + 8, fontFamily: SERIF, fontStyle: 'italic', fontSize: 25, color: INK.key, opacity: 0.85, whiteSpace: 'nowrap'}}>{p.cap}</div>
+				{/* the caption sits at the outer end of the strip: the keepsake lands over the inner edges of the bottom two */}
+				<div style={{position: 'absolute', ...(p.at[0] > 960 ? {right: RB + 2} : {left: RB + 2}), top: RB + RH + 9, fontFamily: SERIF, fontStyle: 'italic', fontSize: 24, color: INK.key, opacity: 0.85, whiteSpace: 'nowrap'}}>
+					{p.cap}
+				</div>
 			</div>
 			{sheet && <Press sheets={[sheet]} />}
 		</>
@@ -618,9 +634,29 @@ export const Explosion: React.FC<{t: number}> = ({t}) => {
 	);
 };
 
-/** Debug: the word's box at t (screen px), to check that nothing lands on it. */
+/** Debug: the word's ink box at t (screen px; its rotation and every impression's offset included), to check that
+ *  nothing lands on it. */
 export const wordBox = (t: number) => {
-	const {cx, cy, w, s} = wordAt(t);
+	const {cx, cy, w, s, rot, imps} = wordAt(t);
 	const h = (w * DH) / DW;
-	return {x0: cx - (w * s) / 2, y0: cy - (h * s) / 2, x1: cx + (w * s) / 2, y1: cy + (h * s) / 2};
+	const r = (Math.abs(rot) * Math.PI) / 180;
+	const hw = ((w * Math.cos(r) + h * Math.sin(r)) * s) / 2;
+	const hh = ((h * Math.cos(r) + w * Math.sin(r)) * s) / 2;
+	const ox = Math.max(0, ...imps.map((im) => Math.abs(im.dx)));
+	const oy = Math.max(0, ...imps.map((im) => Math.abs(im.dy)));
+	return {x0: cx - hw - ox, y0: cy - hh - oy, x1: cx + hw + ox, y1: cy + hh + oy};
 };
+
+/** Debug: the corners of each camera-roll print's paper at t (screen px), for checks against the word and the frame. */
+export const rollCorners = (t: number) =>
+	ROLL.filter((p) => t >= p.t0).map((p) => {
+		const q = rollPose(p, t);
+		const r = (q.rot * Math.PI) / 180;
+		const off = ((RFOOT - RB) / 2) * q.s;
+		const pcx = q.cx - Math.sin(r) * off;
+		const pcy = q.cy + Math.cos(r) * off;
+		const hw = ((RW + 2 * RB) / 2) * q.s;
+		const hh = ((RH + RB + RFOOT) / 2) * q.s;
+		const pts = ([[-1, -1], [1, -1], [1, 1], [-1, 1]] as const).map(([a, b]) => [pcx + a * hw * Math.cos(r) - b * hh * Math.sin(r), pcy + a * hw * Math.sin(r) + b * hh * Math.cos(r)]);
+		return {id: p.id, pts};
+	});

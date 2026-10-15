@@ -5,7 +5,7 @@ import {beatsIn, bt, pulse} from '../timing';
 import {TokTicLogo} from '../ui/TokTicLogo';
 import {Density, useDensities} from './density';
 import {ANTON, INK, MONO, SERIF} from './ink';
-import {clamp01, CropMarks, easeIn, easeOut, inked, kickNudge, lerp, stamp} from './kit';
+import {clamp01, CropMarks, easeOut, inked, kickNudge, lerp, stamp} from './kit';
 import {Poly} from './masks';
 import {Cam, CAM0, Plate, Sheet, sheetMatrix} from './press';
 import {CamLayer, PaperFill, Press} from './Press';
@@ -109,6 +109,17 @@ const HAND29: Poly = [
 ];
 /** P29: the point between the phone and her hand that the shot centres on. */
 const P29_AIM = {u: 0.535, v: 0.47};
+/**
+ * P29: the counter patch laid over the photo's phone once it turns over (TL, TR, BR, BL). Traced on a 0.01 grid:
+ * it takes in the gold frame and the shadow it throws to the right (to u 0.617 at v 0.40, 0.630 at the top corner),
+ * so no second phone edge shows beside the turning one. Its bottom is under her hand.
+ */
+const PATCH29: Pt[] = [
+	[0.506, 0.222],
+	[0.641, 0.284],
+	[0.58, 0.706],
+	[0.432, 0.648],
+];
 /** P30: the top phone of the stack (Sam's freckled fingers on it): left, top, right and bottom corners. */
 const Q30 = {left: [0.484, 0.533] as Pt, top: [0.52, 0.4595] as Pt, right: [0.616, 0.5885] as Pt, bottom: [0.58, 0.662] as Pt};
 const P30_AIM = {u: 0.55, v: 0.561};
@@ -207,8 +218,18 @@ const warm = (t: number, cell: number, seed: number, fresh = 0, o: Partial<Plate
 // ------------------------------------------------------------------ small ink pieces
 
 /** DOM placed by an anchor point: (ax, ay) is the fraction of its own box that sits on (x, y). */
-const Anchor: React.FC<{x: number; y: number; ax?: number; ay?: number; s?: number; rot?: number; children: React.ReactNode}> = ({x, y, ax = 0, ay = 0, s = 1, rot = 0, children}) => (
-	<div style={{position: 'absolute', left: x, top: y, width: 0, height: 0}}>
+const Anchor: React.FC<{x: number; y: number; ax?: number; ay?: number; s?: number; rot?: number; overprint?: boolean; children: React.ReactNode}> = ({
+	x,
+	y,
+	ax = 0,
+	ay = 0,
+	s = 1,
+	rot = 0,
+	overprint = false,
+	children,
+}) => (
+	// (overprint: the whole anchor multiplies onto what is below it; inside its transforms the ink's own multiply cannot)
+	<div style={{position: 'absolute', left: x, top: y, width: 0, height: 0, mixBlendMode: overprint ? 'multiply' : undefined}}>
 		<div style={{position: 'absolute', left: 0, top: 0, transform: `translate(${-ax * 100}%, ${-ay * 100}%)`}}>
 			<div style={{transform: `rotate(${rot}deg) scale(${s})`, transformOrigin: `${ax * 100}% ${ay * 100}%`, whiteSpace: 'nowrap'}}>{children}</div>
 		</div>
@@ -242,10 +263,20 @@ const g29 = (t: number) => {
 const FLIP_AT = FLIP + 2 / 30;
 const FLIP_DUR = 0.17;
 
-/** Her hand only where it lies over the phone (in image fractions; clipped in image px so the cut is true). */
+/**
+ * Her hand only where it lies over the phone and the patch (in image fractions; clipped in image px so the cut is true).
+ * The clip takes the outer of PATCH29 (x1.03) and the phone (x1.14) at each corner, so neither the patch nor the
+ * landing phone (slapped to 1.035) can show past her hand at the bottom end.
+ */
+const HAND29_CLIP: Pt[] = [
+	[0.504, 0.206],
+	[0.645, 0.27],
+	[0.584, 0.735],
+	[0.422, 0.665],
+];
 const HAND29_ON_PHONE: Poly = (() => {
 	const px = (q: Pt[]) => q.map(([u, v]) => [u * 2752, v * 1536] as Pt);
-	return clipConvex(px(HAND29), px(inflate(Q29, 1.14))).map(([x, y]) => [x / 2752, y / 1536] as [number, number]);
+	return clipConvex(px(HAND29), px(HAND29_CLIP)).map(([x, y]) => [x / 2752, y / 1536] as [number, number]);
 })();
 const PhoneFace: React.FC<{t: number; W: number; H: number}> = ({t, W, H}) => (
 	<div style={{position: 'absolute', inset: 0, borderRadius: W * 0.13, background: INK.key}}>
@@ -281,17 +312,61 @@ const FlipShot: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => 
 	const c = Math.cos(Math.PI * k);
 	const land = slapK(t, FLIP_AT + FLIP_DUR);
 	const sheets: Sheet[] = [{map: d.P29, ...g, plates, seed: 29}];
-	// once it lifts, the counter shows where the phone was (the same print, from a clear patch of wood)
-	if (k > 0) sheets.push({map: d.P29, ...g, crop: [-0.205, 0, 0.795, 1], clip: inflate(Q29, 1.06), ground: '#ffffff', plates, seed: 29});
+	// once it lifts, the counter shows where the phone was (the same print, from a clear patch of wood to the left),
+	// the photo's gold frame and its shadow included, so only the turning phone is on the counter
+	// (the wood is lit by the screen on the left and darker to the right of the phone, so the patch's orange is ramped
+	// along it: measured on the plate, 0.21 against 0.35 at its left edge and 0.42 against 0.24 at its right)
+	if (k > 0) {
+		const [hp, kp] = plates;
+		const ramp = (u: number) => lerp(0.6, 1.9, clamp01((u - 0.285) / 0.15));
+		sheets.push({map: d.P29, ...g, crop: [-0.205, 0, 0.795, 1], clip: PATCH29, ground: '#ffffff', plates: [{...hp, mask: ramp}, kp], seed: 29});
+	}
+	// her fingers' shadow on what is under them (the light comes from the top left, as in the photo)
+	const patch = PATCH29.map(([u, v]) => toScreen(g, u, v));
+	const shade = k > 0 ? 0.34 * clamp01(k * 3) : 0;
+	const off = 9 * ((g.s ?? 1.52) / 1.52);
+	const cast = HAND29_ON_PHONE.map(([u, v]): Pt => {
+		const [x, y] = toScreen(g, u, v);
+		return [x + off, y + off * 0.55];
+	});
+	const shadow = shade > 0 ? clipConvex(cast, patch) : [];
 	return (
 		<AbsoluteFill>
 			<PaperFill />
 			<Press sheets={sheets} />
 			<div style={{position: 'absolute', left: 0, top: 0, width: W, height: H, transformOrigin: '0 0', transform: quadMatrix(W, H, quad)}}>
-				<div style={{position: 'absolute', inset: 0, transform: `scale(${Math.abs(c) * (k >= 1 ? land : 1)}, ${k >= 1 ? land : 1})`, transformOrigin: '50% 50%'}}>
+				<div
+					style={{
+						position: 'absolute',
+						inset: 0,
+						transform: `scale(${Math.abs(c) * (k >= 1 ? land : 1)}, ${k >= 1 ? land : 1})`,
+						transformOrigin: '50% 50%',
+					}}
+				>
+					{/* its own shadow on the counter, to the right like the photo's (the patch took the photo's away); only
+					    along the free end of the phone, since the other end is under her hand */}
+					{k > 0 && (
+						<div
+							style={{
+								position: 'absolute',
+								left: W * 0.05,
+								top: W * 0.015,
+								width: W,
+								height: H * 0.5,
+								borderRadius: W * 0.13,
+								background: `rgba(27,26,23,${(0.45 * clamp01(k * 2)).toFixed(3)})`,
+								filter: `blur(${W * 0.02}px)`,
+							}}
+						/>
+					)}
 					{k < 0.5 ? <PhoneFace t={t} W={W} H={H} /> : <PhoneBack W={W} H={H} />}
 				</div>
 			</div>
+			{shadow.length > 2 && (
+				<svg width={1920} height={1080} style={{position: 'absolute', inset: 0, mixBlendMode: 'multiply'}}>
+					<polygon points={shadow.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')} fill={`rgba(27,26,23,${shade.toFixed(3)})`} style={{filter: 'blur(3px)'}} />
+				</svg>
+			)}
 			{/* her hand stays on top of the phone */}
 			<Press blend={false} sheets={[{map: d.P29, ...g, plates, seed: 29, clip: HAND29_ON_PHONE, ground: INK.paper, speckle: 0}]} />
 		</AbsoluteFill>
@@ -347,13 +422,16 @@ type Bat = {
 	stackRot: number;
 	slug: string;
 	tri: number; // v centre of its triptych band
-	maya: Pt; // Maya, where each triptych band pushes in
+	push: Pt; // where its triptych band pushes in (on Maya)
 };
 // Bands traced on the gridded copies: each starts at the first raised arm and keeps every head in the middle third.
+// Push points: Maya in P31 (0.513, 0.41) and P32 (0.518, 0.43). In P33 Maya (0.76, 0.36) is the last of the five, with
+// railings and steps to her right, so its band aims between Sam (0.64) and her: the crop at z 1.75 runs u 0.44 to 0.93,
+// Sam and Maya fill it and Maya sits right of centre.
 const BATS: Bat[] = [
-	{id: 'P31', times: C1, gap: 14, band: [0.13, 0.19, 0.99, 0.765], y: -110, stackRot: -1.3, slug: 'OUT THE DOOR · 02:41 AM', tri: 0.4, maya: [0.513, 0.41]},
-	{id: 'P32', times: C2, gap: 14, band: [0.07, 0.13, 0.95, 0.718], y: 530, stackRot: 0.9, slug: 'THE CORNER SHOP · 02:44 AM', tri: 0.43, maya: [0.518, 0.43]},
-	{id: 'P33', times: C3, gap: 9, band: [0.11, 0.21, 0.97, 0.785], y: 1170, stackRot: -0.7, slug: 'MIDDLE OF THE ROAD · 02:47 AM', tri: 0.4, maya: [0.76, 0.36]},
+	{id: 'P31', times: C1, gap: 14, band: [0.13, 0.19, 0.99, 0.765], y: -110, stackRot: -1.3, slug: 'OUT THE DOOR · 02:41 AM', tri: 0.4, push: [0.513, 0.41]},
+	{id: 'P32', times: C2, gap: 14, band: [0.07, 0.13, 0.95, 0.718], y: 530, stackRot: 0.9, slug: 'THE CORNER SHOP · 02:44 AM', tri: 0.43, push: [0.518, 0.43]},
+	{id: 'P33', times: C3, gap: 9, band: [0.11, 0.21, 0.97, 0.785], y: 1170, stackRot: -0.7, slug: 'MIDDLE OF THE ROAD · 02:47 AM', tri: 0.4, push: [0.685, 0.36]},
 ];
 
 type Cell = {x: number; y: number; w: number; h: number; i: number};
@@ -392,38 +470,87 @@ const place = (i: number, t: number): {x: number; y: number; rot: number} => {
 	return {x: 960, y: b.y - DROP * (1 - k * k), rot: b.stackRot * rk};
 };
 
+/** Battery-local x of the readout's right edge: it rides the charge front, kept on the battery. */
+const readoutX = (b: Bat, t: number) => Math.max(-BW / 2 + 400, Math.min(BW / 2 + 60, frontAt(b, t) + 24));
+/** From a battery's centre up to the top of its readout at the stamp peak (bolt pulse included; measured on renders). */
+const RTOP = 550;
+/** The readout's width at the stamp peak (bolt, figures, %), world px: measured on renders, 385 for '8%'. */
+const readoutW = (b: Bat, t: number) => 270 + 115 * String(pctOf(b, t)).length;
+const SAFE = 54; // title-safe at the top of frame, screen px
+const SIDE = 50; // and at the sides
+/**
+ * Moves the shot only as far as needed for the readout to clear the top of frame by SAFE and the sides by SIDE
+ * (stamp peak and tilt included): down first, then across.
+ */
+const fitReadout = (c: Cam, b: Bat, t: number): Cam => {
+	const rx = 960 + readoutX(b, t);
+	const [l, r] = [camPoint(c, rx - readoutW(b, t), b.y - RTOP), camPoint(c, rx, b.y - RTOP)];
+	const k = c.s * Math.cos(((c.rot ?? 0) * Math.PI) / 180);
+	const top = Math.min(l[1], r[1]);
+	const dx = l[0] < SIDE ? SIDE - l[0] : r[0] > 1920 - SIDE ? 1920 - SIDE - r[0] : 0;
+	return {...c, cx: c.cx - dx / k, cy: top < SAFE ? c.cy - (SAFE - top) / k : c.cy};
+};
+/** 0, 1, 2, 3: which beat of the bar starting at `bar` t is in. */
+const beatOf = (bar: number, t: number) => Math.max(0, beatTimes(bar, bar + 2.5).filter((x) => x <= t).length - 1);
+
+/** 91.1 to 91.3: up the stack, one battery per beat as its bolt and 100% stamp (a hard cut each); 91.4 the whole stack. */
+const STACK_SHOTS: Cam[] = [
+	{cx: 1088, cy: BATS[2].y - 130, s: 0.74, rot: 3}, // the bottom battery, the middle one landing on it at the top of frame
+	{cx: 1088, cy: BATS[1].y, s: 0.74, rot: -3},
+	{cx: 1088, cy: BATS[0].y + 110, s: 0.74, rot: 2.5},
+	{cx: 1000, cy: BATS[1].y, s: 0.5, rot: 0},
+];
+
 /** The battery shots' camera (world space), before the per-kick push and the landing shakes. */
 const baseCam = (t: number): Cam => {
-	const [y1, y2, y3] = BATS.map((b) => b.y);
-	if (t < C1[0]) return {cx: 990, cy: y1, s: 0.92}; // 85.4: the empty battery
-	if (t < BAR87) return {cx: 985, cy: y1 - 22, s: 1.0}; // 86.1 wide
-	if (t < BAR88) {
-		// 87.1 tight on the faces at the charge front, the readout riding above it
-		const fx = frontAt(BATS[0], t, 0.16);
-		return {cx: 960 + Math.max(-330, Math.min(330, fx - 120)), cy: y1 - 250, s: 1.75};
+	const [b1, b2, b3] = BATS;
+	if (t < C1[0]) return {cx: 990, cy: b1.y, s: 0.92}; // 85.4: the empty battery, 'real life' at 0%
+	if (t < BAR87) {
+		// 86.1 tight on the left end (its edge held at x 110), a step closer on every beat with the tilt flipping
+		const i = beatOf(bt(86), t);
+		const s = [1.28, 1.36, 1.44, 1.52][i];
+		return fitReadout({cx: 210 + 850 / s, cy: b1.y - 150, s, rot: [0, -1.5, 1.5, -1.5][i]}, b1, t);
 	}
-	if (t < C2[0]) return {cx: 975, cy: y1 - 20, s: 0.98, rot: -4}; // 88.1 wide, turned
+	if (t < BAR88) {
+		// 87.1 wide with 'real life' and the slug, the tilt flipping and the scale stepping on every beat (a wide shot is
+		// at most about 0.97: the readout above and 'real life' below take 1010 world px)
+		const i = beatOf(BAR87, t);
+		const fx = frontAt(b1, t, 0.14);
+		return fitReadout({cx: 975 + 0.1 * fx, cy: b1.y - 20, s: [0.93, 0.97, 0.93, 0.97][i], rot: [-3, 2.5, -2.5, 3][i]}, b1, t);
+	}
+	if (t < C1[11]) {
+		// 88.1 tight on the faces at the charge front, the readout riding above it
+		const i = beatOf(BAR88, t);
+		const fx = frontAt(b1, t, 0.16);
+		return fitReadout({cx: 960 + Math.max(-330, Math.min(330, fx - 120)), cy: b1.y - 250, s: 1.6, rot: [1.5, -1.5, 1.5][i]}, b1, t);
+	}
+	if (t < C2[0]) return fitReadout({cx: 975, cy: b1.y - 40, s: 0.93, rot: 3}, b1, t); // 88.4 out wide on the 100%: CHARGED
 	if (t < C3[0]) {
 		// battery 2: a fast pan along the faces as it charges twice as fast; out wide on the last half-beat
 		const k = clamp01((t - C2[0]) / (C2[7] - C2[0]));
 		const out = outBack((t - C2[7]) / 0.17, 1.4);
 		// (the faces sit at the battery's mid-height: the shot centres a little above them so the readout fits on top)
-		return {cx: 960 + lerp(lerp(-300, 320, k), 25, out), cy: y2 + lerp(-190, -22, out), s: lerp(1.35, 0.99, out), rot: lerp(2.5, 0, out)};
+		return fitReadout({cx: 960 + lerp(lerp(-300, 320, k), 25, out), cy: b2.y + lerp(-190, -40, out), s: lerp(1.35, 0.93, out), rot: lerp(2.5, 0, out)}, b2, t);
 	}
 	if (t < ZOOM0) {
-		// battery 3: a step closer on every beat of the bar, the tilt flipping
-		const i = Math.max(0, countAt(beatTimes(bt(90), bt(91)), t) - 1);
-		return {cx: 960 + [10, -20, 90, 200][i], cy: y3 + [-17, -17, -128, -150][i], s: [0.99, 1.1, 1.23, 1.38][i], rot: [3, -2, 2, -3][i]};
+		// battery 3: a step closer on every beat of the bar, the tilt flipping ('real life' is either all in or all out)
+		const i = beatOf(bt(90), t);
+		return fitReadout({cx: 960 + [10, -20, 90, 200][i], cy: b3.y + [-17, -17, -128, -150][i], s: [0.94, 1.21, 1.31, 1.42][i], rot: [3, -2, 2, -3][i]}, b3, t);
 	}
-	// 91.1: out to the stack (outBack, leaving two frames early so the downbeat frame already has the stack); a punch on
-	// every bolt, the hardest on 91.4
+	// 91.1: out to the bottom battery as the other two drop onto it (outBack, leaving two frames early so the downbeat
+	// frame already has them landing); then a hard cut up the stack on each bolt, punched in, and out to it all on 91.4
+	const k = countAt(BOLTS, t) - 1;
+	if (k >= 1) {
+		const c = STACK_SHOTS[k];
+		const punch = 1 + (k < 3 ? 0.07 : 0.05) * decay(t, BOLTS[k], 0.1); // (91.4's is smaller: the stack fills the height)
+		return {...c, s: c.s * punch, rot: (c.rot ?? 0) * (1 + 0.5 * decay(t, BOLTS[k], 0.08))};
+	}
 	const from = baseCam(ZOOM0 - 1e-3);
+	const to = STACK_SHOTS[0];
 	const e = outBack((t - ZOOM0) / 0.15, 1.2);
-	const to: Cam = {cx: 1000, cy: y2, s: 0.5, rot: 0};
-	const punch = 1 + 0.03 * decay(t, BOLTS[1], 0.1) + 0.03 * decay(t, BOLTS[2], 0.1) + 0.06 * decay(t, BOLTS[3], 0.12);
 	// scale interpolated in log space, so the pull-out reads as one even move
 	const s = Math.exp(lerp(Math.log(from.s), Math.log(to.s), e));
-	return {cx: lerp(from.cx, to.cx, e), cy: lerp(from.cy, to.cy, e), s: s * punch, rot: lerp(from.rot ?? 0, 0, e)};
+	return {cx: lerp(from.cx, to.cx, e), cy: lerp(from.cy, to.cy, e), s, rot: lerp(from.rot ?? 0, to.rot ?? 0, e)};
 };
 
 const camAt = (t: number): Cam => {
@@ -442,7 +569,8 @@ const cellSheets = (b: Bat, i: number, d: Record<string, Density>, t: number, ce
 	const r = (p.rot * Math.PI) / 180;
 	const [u0, v0, u1, v1] = b.band;
 	const out: Sheet[] = [];
-	const tau = b.times.length > 12 ? 0.045 : b.times.length > 8 ? 0.06 : 0.08;
+	// (one per beat: the flood clears by the second frame, so even the first cell is a picture, not an orange bar)
+	const tau = b.times.length > 12 ? 0.045 : b.times.length > 8 ? 0.06 : 0.05;
 	for (const c of cellsOf(b)) {
 		if (c.i >= n) break;
 		const at = b.times[c.i];
@@ -505,7 +633,7 @@ const Dress: React.FC<{b: Bat; t: number; from: number}> = ({b, t, from}) => {
 	const last = n > 0 ? b.times[n - 1] : from;
 	const st = stamp(t, last);
 	const brand = stamp(t, from);
-	const rx = Math.max(-BW / 2 + 400, Math.min(BW / 2 + 60, frontAt(b, t) + 24));
+	const rx = readoutX(b, t);
 	const bolt = 1 + 0.14 * pulse(t, 0.08);
 	return (
 		<>
@@ -586,7 +714,8 @@ const Slam: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 const Batteries: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 	const cam = camAt(t);
 	const shown = t < C2[0] ? [0] : t < C3[0] ? [1] : t < ZOOM0 ? [2] : [0, 1, 2];
-	const cell = cam.s < 0.75 ? 12 : 6.5;
+	// the screen coarsens only on the hard cut out to the whole stack (91.4), never during a move
+	const cell = t >= BOLTS[3] ? 12 : 6.5;
 	const sheets = shown.flatMap((i) => cellSheets(BATS[i], i, d, t, cell));
 	const knock = easeOut((t - EMPTY) / 0.1);
 	const stacked = t >= ZOOM0;
@@ -597,7 +726,8 @@ const Batteries: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) =>
 			<CamLayer cam={cam}>
 				{shown.map((i) => {
 					const b = BATS[i];
-					const from = i === 0 ? C1[0] : b.times[0];
+					// battery 1 is branded 'real life' from 85.4, at 0%: the opposite of the phone's 100%
+					const from = i === 0 ? EMPTY : b.times[0];
 					return (
 						<Casing key={i} b={b} i={i} t={t} knock={i === 0 ? knock : 1}>
 							{i === 0 && t < C1[0] && (
@@ -605,7 +735,7 @@ const Batteries: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) =>
 									<Pct v={0} size={400} color={INK.key} />
 								</Anchor>
 							)}
-							{!stacked && (i > 0 || t >= C1[0]) && <Dress b={b} t={t} from={from} />}
+							{!stacked && <Dress b={b} t={t} from={from} />}
 							{stacked && <StackDress i={i} t={t} />}
 						</Casing>
 					);
@@ -623,11 +753,11 @@ const StackDress: React.FC<{i: number; t: number}> = ({i, t}) => {
 	const st = stamp(t, at);
 	return (
 		<>
-			<Anchor {...L(-BW / 2 - 70, 0)} ax={1} ay={0.5} s={st.s * (1 + 0.1 * pulse(t, 0.08))}>
-				<Bolt h={420} seed={i + 2} />
+			<Anchor {...L(-BW / 2 - 40, 0)} ax={1} ay={0.5} s={st.s * (1 + 0.1 * pulse(t, 0.08))}>
+				<Bolt h={360} seed={i + 2} />
 			</Anchor>
-			<Anchor {...L(BW / 2 + 120, 8)} ax={0} ay={0.5} s={st.s}>
-				<Pct v={100} size={250} seed={i + 5} />
+			<Anchor {...L(BW / 2 + 100, 8)} ax={0} ay={0.5} s={st.s}>
+				<Pct v={100} size={220} seed={i + 5} />
 			</Anchor>
 		</>
 	);
@@ -637,7 +767,7 @@ const StackDress: React.FC<{i: number; t: number}> = ({i, t}) => {
 const BigBolt: React.FC<{t: number; fall?: number}> = ({t, fall = 0}) => {
 	const st = stamp(t, BOLTS[3]);
 	return (
-		<Anchor x={960} y={548 + fall} ax={0.5} ay={0.5} s={st.s} rot={-9 + fall * 0.02}>
+		<Anchor x={960} y={548 + fall} ax={0.5} ay={0.5} s={st.s} rot={-9 + fall * 0.02} overprint>
 			<Bolt h={1040} seed={9} />
 		</Anchor>
 	);
@@ -658,8 +788,8 @@ const bandCrop = (b: Bat, r: Rect, vc: number, z: number): [number, number, numb
 	const cwU = (b.band[2] - b.band[0]) / z;
 	const chV = Math.min(0.999, (cwU * 2752) / aspect / 1536);
 	const k = (z - 1) / 0.75;
-	const uc = Math.max(cwU / 2, Math.min(1 - cwU / 2, lerp((b.band[0] + b.band[2]) / 2, b.maya[0], k)));
-	const vcz = Math.max(chV / 2, Math.min(1 - chV / 2, lerp(vc, b.maya[1], k)));
+	const uc = Math.max(cwU / 2, Math.min(1 - cwU / 2, lerp((b.band[0] + b.band[2]) / 2, b.push[0], k)));
+	const vcz = Math.max(chV / 2, Math.min(1 - chV / 2, lerp(vc, b.push[1], k)));
 	return [uc - cwU / 2, vcz - chV / 2, uc + cwU / 2, vcz + chV / 2];
 };
 
@@ -671,7 +801,8 @@ const Triptych: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => 
 	const x = (t - TRIP) / 0.14;
 	const e = outBack(x, 1.1);
 	const shut = easeOut(x);
-	const q = easeIn((t - COLLAPSE) / 0.2);
+	// 172.565: a fast squeeze (ease-out: it moves on the cue frame and is flat by f5180), so the bare Rule holds 4 frames
+	const q = easeOut((t - COLLAPSE) / 0.15);
 	const sheets: Sheet[] = [];
 	const casings: {r: Rect; rot: number}[] = [];
 	BATS.forEach((b, i) => {
@@ -724,7 +855,8 @@ const Triptych: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => 
 			sheets.push({map: d[b.id], crop: [cu0, cv0, cu1, cv1], w: r.w, h: r.h, cx: cxr, cy: cyr, s: kick * (t >= PUSHES[i] ? stamp(t, PUSHES[i]).s : 1), plates: warm(t, 7.5, 60 + i, fresh), seed: 90 + i});
 		}
 	});
-	const flat = clamp01((q - 0.5) / 0.5);
+	// the bare Rule holds from about f5180, thinning from 28 px to the 7 px line over its last frames
+	const thin = clamp01((t - COLLAPSE - 0.11) / 0.1);
 	const pad = PAD * cam.s * (1 - shut);
 	const stroke = STROKE * cam.s * (1 - shut);
 	return (
@@ -750,7 +882,7 @@ const Triptych: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => 
 				/>
 			))}
 			{/* the flat Rule: what is left of the night when it is squeezed flat, ready for 'Flatline' */}
-			{q > 0.5 && <div style={{position: 'absolute', left: 0, top: 540 - lerp(14, 3.5, flat), width: 1920, height: lerp(28, 7, flat), background: INK.key, mixBlendMode: 'multiply', ...inked(1024, 0, 0, true)}} />}
+			{q > 0.6 && <div style={{position: 'absolute', left: 0, top: 540 - lerp(14, 3.5, thin), width: 1920, height: lerp(28, 7, thin), background: INK.key, mixBlendMode: 'multiply', ...inked(1024, 0, 0, true)}} />}
 		</AbsoluteFill>
 	);
 };

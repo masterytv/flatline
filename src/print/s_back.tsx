@@ -81,12 +81,12 @@ const Q25: Pt[] = [
 ];
 /** P27: the phone in her hand, the notch end up-left. */
 const Q27: Pt[] = [
-	[0.39, 0.691],
-	[0.514, 0.858],
-	[0.505, 0.93],
-	[0.384, 0.757],
+	[0.391, 0.693],
+	[0.515, 0.845],
+	[0.52, 0.921],
+	[0.387, 0.761],
 ];
-/** P27: Maya (hair, face, jacket and the arm down to the phone hand). */
+/** P27: Maya (hair, face, jacket, the arm, and the hand with the phone in it, so her fingers print cold too). */
 const MAYA27: Poly = [
 	[0.6, 0.03],
 	[0.65, 0.022],
@@ -103,12 +103,41 @@ const MAYA27: Poly = [
 	[0.908, 0.8],
 	[0.91, 1.0],
 	[0.48, 1.0],
-	[0.475, 0.93],
-	[0.468, 0.88],
-	[0.47, 0.8],
-	[0.48, 0.76],
-	[0.505, 0.74],
-	[0.51, 0.65],
+	// the hand under the phone: two fingers, the index fingertip, the blurred finger below the bezel
+	[0.478, 0.952],
+	[0.47, 0.942],
+	[0.462, 0.934],
+	[0.4545, 0.922],
+	[0.452, 0.908],
+	[0.447, 0.899],
+	[0.4365, 0.896],
+	[0.4305, 0.878],
+	[0.4345, 0.861],
+	[0.433, 0.848],
+	[0.42, 0.845],
+	[0.412, 0.832],
+	// the phone's case: its bottom edge, the notch end, its top edge up to the thumb
+	[0.409, 0.818],
+	[0.4, 0.804],
+	[0.39, 0.795],
+	[0.38, 0.784],
+	[0.3745, 0.766],
+	[0.3745, 0.748],
+	[0.377, 0.728],
+	[0.381, 0.702],
+	[0.386, 0.685],
+	[0.392, 0.683],
+	[0.45, 0.757],
+	[0.471, 0.784],
+	// the thumb, then the sleeve's edge
+	[0.4765, 0.775],
+	[0.4775, 0.762],
+	[0.484, 0.752],
+	[0.494, 0.749],
+	[0.505, 0.752],
+	[0.513, 0.745],
+	[0.513, 0.7],
+	[0.511, 0.65],
 	[0.52, 0.57],
 	[0.535, 0.525],
 	[0.545, 0.45],
@@ -119,8 +148,7 @@ const MAYA27: Poly = [
 	[0.575, 0.06],
 ];
 const FACE27 = {u: 0.636, v: 0.34};
-/** P28: Jess's face, and the point between her face and her held-out hand (the split crop centre). */
-const JESS28 = {u: 0.5, v: 0.42};
+/** P28: the point between Jess's face (0.5, 0.42) and her held-out hand (0.40, 0.68): the split crop centre. */
 const JESS28_MID = {u: 0.49, v: 0.5};
 /** Phone centres (where the cold spreads from). */
 const PHONE24 = {u: 0.59, v: 0.665};
@@ -236,11 +264,13 @@ const warmPlates = (t: number, cell: number, seed: number, o: Partial<Plate> = {
 const LimeScreen: React.FC<{quad: Pt[]; W: number; H: number; pct: number; t: number; beats: number[]; amp?: number; win?: number}> = ({quad, W, H, pct, t, beats, amp = 0.3, win = 1.3}) => {
 	const label = `${pct}%`;
 	const size = Math.min(H * 0.66, (W * 0.5) / (0.6 * label.length));
+	// the logo and the trace's live end sit inboard: on a macro the photo's notch and bezel print over the rim
 	const x0 = W * 0.52;
+	const x1 = W * 0.9;
 	const pts: string[] = [];
 	const live = beats.filter((b) => b <= t && b > t - win - 0.3);
-	for (let px = x0; px <= W + 0.1; px += W / 220) {
-		const tx = t - (1 - (px - x0) / (W - x0)) * win;
+	for (let px = x0; px <= x1 + 0.1; px += W / 220) {
+		const tx = t - (1 - (px - x0) / (x1 - x0)) * win;
 		let v = 0;
 		for (const b of live) if (tx - b > -0.2 && tx - b < 0.25) v += ecg(tx - b);
 		pts.push(`${px.toFixed(1)},${(H * 0.6 - v * H * amp).toFixed(1)}`);
@@ -264,12 +294,12 @@ const LimeScreen: React.FC<{quad: Pt[]; W: number; H: number; pct: number; t: nu
 			<div style={{position: 'absolute', left: W * 0.05, top: H * 0.56 - size * 0.62, fontFamily: MONO, fontWeight: 500, fontSize: size, lineHeight: 1, letterSpacing: -size * 0.05, color: INK.key, whiteSpace: 'nowrap'}}>
 				{label}
 			</div>
-			<div style={{position: 'absolute', right: W * 0.05, top: H * 0.1}}>
+			<div style={{position: 'absolute', right: W * 0.12, top: H * 0.14}}>
 				<TokTicLogo size={H * 0.11} t={t} color={INK.key} />
 			</div>
 			<svg width={W} height={H} style={{position: 'absolute', left: 0, top: 0, overflow: 'visible'}}>
 				<polyline points={pts.join(' ')} fill="none" stroke={INK.cold} strokeWidth={H * 0.035} strokeLinejoin="round" strokeLinecap="round" />
-				<circle cx={W - H * 0.02} cy={pts.length ? Number(pts[pts.length - 1].split(',')[1]) : H * 0.6} r={H * 0.035} fill={INK.cold} />
+				<circle cx={x1} cy={pts.length ? Number(pts[pts.length - 1].split(',')[1]) : H * 0.6} r={H * 0.035} fill={INK.cold} />
 			</svg>
 		</div>
 	);
@@ -485,7 +515,7 @@ const P25Shot: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 			<PaperFill />
 			<Press sheets={[{map: d.P25, ...g, plates, seed: 25}]} />
 			<LimeScreen quad={quad} W={1000} H={240} pct={pctAt(t)} t={t} beats={PCT_BEATS} amp={0.28} />
-			<Card x={60} y={230} w={600} t={t} at={LIKES} rot={-2.2} text="You missed 212 likes" size={68} seed={1} />
+			<Card x={60} y={40} w={480} t={t} at={LIKES} rot={-2.2} text="You missed 212 likes" size={68} seed={1} />
 			<Card x={280} y={540} w={720} t={t} at={TAGS} rot={1.6} head="TOKTIC · JESS.WAV" text="jess.wav tagged you in 14 photos" size={58} seed={2} />
 		</>
 	);
@@ -575,11 +605,34 @@ const P26Card: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 // ------------------------------------------------------------------ the flood: 'hear the monitor sing'
 
 /** One warm face per beat (P26: Dev mid-song, Sam, Kai; then P25: Maya laughing), each buried by the cold within the beat. */
-const MACROS: {id: 'P25' | 'P26'; u: number; v: number; wu: number; text: string; x: number; y: number; rot: number}[] = [
+type Macro = {
+	id: 'P25' | 'P26';
+	u: number;
+	v: number;
+	wu: number;
+	/** where the face lands on screen */
+	at?: Pt;
+	/** a finer screen and a tone curve for a pale face on a pale wall */
+	cell?: number;
+	heat?: Partial<Plate>;
+	key?: Partial<Plate>;
+	text: string;
+	x: number;
+	y: number;
+	rot: number;
+};
+// Sam and Maya are pale, evenly lit faces against pale walls. At 8.5 their eyes and mouths are two cells wide and
+// print as nothing, so each face was bare paper inside a hair mass. Both get a finer screen (about 16 to 18 px on
+// screen, still a macro dot) and a heavier key, so the eyes and mouth print. Sam (skin and wall both near 0) gets a
+// gamma that brings up her features; Maya (skin about 0.1 to 0.2, the wall in front of her nose about 0.45) gets the
+// opposite curve, so her face stays clean paper cut out against the orange wall, with the eye, nostril and laughing
+// mouth in key. Traced on the faces: P26 Sam eye 0.715,0.33, mouth 0.715,0.375; P25 Maya eye 0.353,0.362, mouth
+// 0.36,0.40, nose tip 0.372,0.38 (Jess's face to her right, 0.41 to 0.44, sits at the frame's right edge).
+const MACROS: Macro[] = [
 	{id: 'P26', u: 0.37, v: 0.4, wu: 0.4, text: 'maya, come back', x: 60, y: 40, rot: -2.5},
-	{id: 'P26', u: 0.72, v: 0.36, wu: 0.4, text: "everyone's online", x: 320, y: 178, rot: 1.8},
-	{id: 'P26', u: 0.585, v: 0.42, wu: 0.4, text: "you're missing it", x: 590, y: 316, rot: -1.4},
-	{id: 'P25', u: 0.335, v: 0.385, wu: 0.48, text: "don't go", x: 860, y: 452, rot: 2.4},
+	{id: 'P26', u: 0.72, v: 0.355, wu: 0.28, cell: 5, heat: {gain: 1.4, lift: 0.03, gamma: 0.6}, key: {gain: 1.2, gamma: 0.8}, text: "everyone's online", x: 320, y: 178, rot: 1.8},
+	{id: 'P26', u: 0.588, v: 0.415, wu: 0.32, cell: 5.5, heat: {gain: 1.3, lift: 0.02, gamma: 0.7}, key: {gain: 1.2, gamma: 0.8}, text: "you're missing it", x: 590, y: 316, rot: -1.4},
+	{id: 'P25', u: 0.36, v: 0.39, wu: 0.22, at: [1300, 830], cell: 4, heat: {gain: 1.2, gamma: 1.2}, key: {gain: 1.5, gamma: 0.6}, text: "don't go", x: 860, y: 452, rot: 2.4},
 ];
 const FACE_AT: Pt = [1350, 760];
 const COVER = [0.5, 0.65, 0.82, 1.05];
@@ -614,14 +667,20 @@ const FloodScene: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) =
 	const since = t - FLOOD[k];
 	const sl = slap(t, FLOOD[k]);
 	const S = (sl.s + 0.02 * clamp01(since / 0.45)) / m.wu;
-	const g = aim(m.u, m.v, S, FACE_AT[0], FACE_AT[1]);
+	const [ax, ay] = m.at ?? FACE_AT;
+	const g = aim(m.u, m.v, S, ax, ay);
 	// the cold rolls in from the bottom-right corner and buries the face within the beat
-	const cu = m.u + (1920 - FACE_AT[0]) / (S * FW);
-	const cv = m.v + (1080 - FACE_AT[1]) / (S * FH);
+	const cu = m.u + (1920 - ax) / (S * FW);
+	const cv = m.v + (1080 - ay) / (S * FH);
 	const diag = Math.hypot((1920 / (S * FW)) * ASPECT, 1080 / (S * FH));
 	const R = COVER[k] * diag * easeInOut(clamp01((since - 0.05) / 0.33));
 	const cold = spreadMask(cu, cv, R, 81 + k);
-	const plates: Plate[] = [HEAT(8.5, {mask: (u, v) => 1 - cold(u, v), dx: 6 * Math.exp(-since / 0.08), dy: -4 * Math.exp(-since / 0.08)}), COLD(8, {mask: cold, gain: 1.1}), KEY(8.5)];
+	const cell = m.cell ?? 8.5;
+	const plates: Plate[] = [
+		HEAT(cell, {mask: (u, v) => 1 - cold(u, v), dx: 6 * Math.exp(-since / 0.08), dy: -4 * Math.exp(-since / 0.08), ...m.heat}),
+		COLD(8, {mask: cold, gain: 1.1}),
+		KEY(cell, m.key),
+	];
 	const n = Math.round(4 - k);
 	const pct = pctAt(t);
 	const cd = stamp(t, FLOOD[k]);
@@ -629,10 +688,11 @@ const FloodScene: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) =
 		<>
 			<PaperFill />
 			<Press sheets={[{map: d[m.id], ...g, plates, seed: 90 + k}]} />
+			{/* the monitor line runs under the cards, so its spikes never cut their type */}
+			<SweepECG t={t} y={612} amp={150} />
 			{MACROS.slice(0, k + 1).map((c, i) => (
 				<Card key={i} x={c.x} y={c.y} t={t} at={FLOOD[i]} rot={c.rot} text={c.text} size={60} seed={10 + i} />
 			))}
-			<SweepECG t={t} y={612} amp={150} />
 			{/* the streak countdown */}
 			<div
 				style={{
@@ -787,7 +847,9 @@ const ColdFace: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => 
 /** 155.504: Jess in the bright doorway, calling her. */
 const JessShot: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 	const sl = slap(t, JESS);
-	const g = aim(JESS28.u, 0.5, (sl.s + punch(t, JESS2, 0.06)) / 0.82);
+	// tight enough for her face to read (and her held-out hand and the bright doorway stay in), so the split's 2.17x
+	// continues the push
+	const g = aim(0.47, 0.5, (sl.s + punch(t, JESS2, 0.06)) * 1.85);
 	return (
 		<>
 			<PaperFill />
@@ -806,7 +868,7 @@ const splitX = (t: number) => {
 	let x = 960 * e(SPLIT); // cold slams in from the left, shoving Jess right
 	x += (600 - 960) * e(WARM_PUSH);
 	x += (1210 - 600) * e(COLD_PUSH);
-	x += (0 - 1210) * easeOut((t - WARM_FLOOD) / 0.14);
+	x += (-80 - 1210) * easeOut((t - WARM_FLOOD) / 0.14); // past the edge: the lean leaves no paper wedge
 	return x;
 };
 
@@ -845,9 +907,9 @@ const Caption: React.FC<{t: number}> = ({t}) => {
 	if (!st.on) return null;
 	return (
 		<svg width={1920} height={1080} style={{position: 'absolute', left: 0, top: 0, overflow: 'visible', ...inked(900, 11, 3, true)}}>
-			<g transform={`translate(70 1010) scale(${st.s}) translate(-70 -1010)`}>
+			<g transform={`translate(70 1000) scale(${st.s}) translate(-70 -1000)`}>
 				{(['to feel', 'everything'] as const).map((w, i) => (
-					<text key={w} x={70 + i * 18} y={870 + i * 140} fontFamily="Instrument Serif" fontStyle="italic" fontSize={168} fill={INK.key} stroke={INK.paper} strokeWidth={26} strokeLinejoin="round" paintOrder="stroke">
+					<text key={w} x={70} y={875 + i * 125} fontFamily="Instrument Serif" fontStyle="italic" fontSize={150} fill={INK.key} stroke={INK.paper} strokeWidth={26} strokeLinejoin="round" paintOrder="stroke">
 						{w}
 					</text>
 				))}
