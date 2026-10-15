@@ -16,7 +16,9 @@ export const F = {
 	glowsOff: [bt(62, 3), bt(63), bt(63, 3), bt(64), bt(64, 3)],
 	join: bt(65), // they join her
 	groove: bt(68), // 2:07.1
-	noWords: [snap(128), snap(129), snap(130), snap(131)], // "No pain, no fear, no clock, no name"
+	// "No pain, no fear, no clock, no name": the start of each sung "no", measured from the voice (the phrases are
+	// syncopated, so beats were up to 0.7 s early; Tom, 2026-10-15). The second words land about 128.90, 129.88, 130.50, 131.5.
+	noWords: [128.72, 129.62, 130.32, 130.95],
 	light: snap(132), // "Just light, so bright"
 	fourMin: snap(135), // "gone for four minutes"
 	forever: snap(137), // "free for forever"

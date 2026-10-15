@@ -25,7 +25,9 @@ export const T = {
 	spark: snap(49), // "Every beat a spark": each beat flashes a post
 	fire: snap(55), // "drum's on fire": huge heart, red 1%
 	fade: downbeat(32), // screen dims and glitches
-	clear: snap(65), // "Clear!": crack, 0%, black
+	// "Clear!": crack, 0%, black. Measured from the voice, not snapped to the beat: the 'Cl' attack starts about 65.27 and
+	// the vowel peaks at 65.45 (Tom heard the beat at 64.946 as half a second early).
+	clear: 65.33,
 	rebuild: downbeat(36), // she looks up; party fades in out of focus
 	riser: 77, // focus sharpens, frame edges crack
 	kickOut: downbeat(43), // hold on her face, eyes up

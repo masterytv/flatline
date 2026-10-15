@@ -101,8 +101,9 @@ const CAPPX = CAP * NK;
 const LX = 74;
 const BASE = [256, 470, 684, 898];
 const LINE_INK = [INK.key, INK.heat, INK.key, INK.heat];
-const WORDS = F.noWords; // 128.058, 128.964, 129.892, 130.810
+const WORDS = F.noWords; // 128.72, 129.62, 130.32, 130.95: on the sung "no" of each phrase
 const P13_CUT = bt(68, 2); // 127.594
+const P13_CLOSE = bt(68, 3); // 128.058: tight on the row of faces, so the roof still changes every beat before NO PAIN
 const PUSH = bt(70, 3); // 131.727: the pile jogs square, the push into the O starts
 /** The counter of the O of NO NAME, world px. */
 const O_PTS: [number, number][] = O_COUNTER.map(([x, y]) => [LX + (O_ORIGIN + x) * NK, BASE[3] + y * NK]);
@@ -295,8 +296,9 @@ const P13Shot: React.FC<{t: number; map: Density}> = ({t, map}) => {
 	const v = ((D / tau) * Math.exp(-dt / tau)) / 30;
 	const blur = Math.min(36, v * 0.3);
 	const cut = t >= P13_CUT;
-	const s = (1 + 0.3 * Math.exp(-dt / tau)) * (cut ? punch(t, P13_CUT, 0.05) : 1);
-	const crop: Crop = cut ? cropAt(0.53, 0.5, 1.75) : [0, 0, 1, 1];
+	const close = t >= P13_CLOSE;
+	const s = (1 + 0.3 * Math.exp(-dt / tau)) * (close ? punch(t, P13_CLOSE, 0.05) : cut ? punch(t, P13_CUT, 0.05) : 1);
+	const crop: Crop = close ? cropAt(0.55, 0.41, 2.8) : cut ? cropAt(0.53, 0.5, 1.75) : [0, 0, 1, 1];
 	const cam = beatHit(CAM0, t, 0.8);
 	return (
 		<AbsoluteFill>
@@ -305,7 +307,7 @@ const P13Shot: React.FC<{t: number; map: Density}> = ({t, map}) => {
 				<PaperFill />
 				<Press cam={cam} sheets={[{map, ...FULL, cx: FULL.cx + x, s, crop, seed: 13, plates: heatKey(8.5)}]} />
 			</AbsoluteFill>
-			<Slug x={40} y={1046} text={cut ? 'THE ROOF · 02:07 · CUT IN' : 'THE ROOF · 02:07 · O 15° K 45°'} size={14} color={INK.paper} />
+			<Slug x={40} y={1046} text={close ? 'THE ROOF · 02:08 · CLOSE' : cut ? 'THE ROOF · 02:07 · CUT IN' : 'THE ROOF · 02:07 · O 15° K 45°'} size={14} color={INK.paper} />
 		</AbsoluteFill>
 	);
 };
