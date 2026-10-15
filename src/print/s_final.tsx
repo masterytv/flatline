@@ -8,7 +8,7 @@ import {clamp01, CropMarks, easeOut, inked, kickNudge, lerp, RegTarget, Rule, Sl
 import {Cam, Plate, plateDots, Sheet, sheetMatrix} from './press';
 import {CamLayer, Paper, Press} from './Press';
 import {KeepsakePrint} from './s_keepsake';
-import {VMap} from './stage';
+import {Frame, K_FILL, useStage, VMap} from './stage';
 
 // 3:07.8 to 3:21.9, the final drop back in the living room.
 // Macros: one giant halftone close-up per beat (P41-P43), heat + key only, cream and orange stock in turn.
@@ -69,9 +69,8 @@ const beatHit = (cam: Pose, t: number, from: number, to: number, amp = 1): Cam =
 	};
 };
 
-const backOut = (x: number) => {
+const backOut = (x: number, c = 1.9) => {
 	const k = clamp01(x) - 1;
-	const c = 1.9;
 	return 1 + (c + 1) * k * k * k + c * k * k;
 };
 
@@ -115,6 +114,30 @@ const MACROS: MacroDef[] = [
 ];
 const MACRO_END = bt(103);
 
+// 9:16: the phone sees the stage through SEAM (stage x 656-1264, the full height), a portrait window onto each crop, so
+// every macro is re-cropped for it (same beats, same plates). u, v: the crop centre; z: the photo height shown (the window
+// is 0.316 z photo widths wide). Read off the same gridded P41-P43. The window shows a face about 0.65 times as many
+// stage px across as the 16:9 crop, so at the 16:9 cell a face was 16 dots wide and stopped reading on the phone: each
+// cell is scaled by the same factor (z 16:9 / z 9:16), which keeps the 16:9's dots per face (about 26 across Jess's).
+const MACROS_V: Pick<MacroDef, 'a' | 'b' | 'cell'>[] = [
+	// Jess: her face from the hoop (u 0.27) to the bridge of Dev's nose, hair to chin
+	{a: [0.39, 0.47, 0.78], b: [0.4, 0.46, 0.68], cell: 20},
+	// Kai whole, the 16:9's garment silhouette upright: his hair an arch at the top, the black overshirt flung open from the
+	// shoulders, the sleeves running out of both sides of the frame like wings, the panels hanging down the edges (his face
+	// is not in P42's key plate at any gain, so it stays bare orange stock as in 16:9)
+	{a: [0.5, 0.5, 0.98], b: [0.51, 0.45, 0.86], cell: 20},
+	// Maya's hair flying up, her face in it
+	{a: [0.335, 0.41, 0.8], b: [0.345, 0.37, 0.66], cell: 18},
+	// Dev laughing, eyes shut
+	{a: [0.62, 0.45, 0.8], b: [0.625, 0.43, 0.7], cell: 19},
+	// Kai's face, fringe to chin, filling the width
+	{a: [0.525, 0.33, 0.64], b: [0.525, 0.31, 0.54], cell: 20},
+	// Sam's face in the curls
+	{a: [0.7, 0.335, 0.66], b: [0.695, 0.34, 0.56], cell: 21},
+	// the hoop and Jess's cheek, with the corner of her laughing mouth so the ring reads as an earring
+	{a: [0.325, 0.56, 0.5], b: [0.32, 0.575, 0.42], cell: 18},
+];
+
 const macroSheet = (m: MacroDef, t: number, t1: number, map: Density, n: number): Sheet => {
 	const dur = t1 - m.t0;
 	const x = (t - m.t0) / dur;
@@ -142,18 +165,21 @@ const macroSheet = (m: MacroDef, t: number, t1: number, map: Density, n: number)
 
 export const Macros: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P41', 'P42', 'P43']);
+	const {vertical} = useStage();
 	let n = 0;
 	while (n + 1 < MACROS.length && MACROS[n + 1].t0 <= t) n++;
-	const m = MACROS[n];
+	const m = vertical ? {...MACROS[n], ...MACROS_V[n]} : MACROS[n];
 	const t1 = n + 1 < MACROS.length ? MACROS[n + 1].t0 : MACRO_END;
 	const sheet = d ? macroSheet(m, t, t1, d[m.id], n) : null;
+	// 9:16: the slug label sits in the phone's window (bottom left), a size smaller so it fits its 607 px
+	const [lx, ly, ls] = vertical ? [656 + 26, 1012, 12] : [48, 1016, 17];
 	return (
 		<AbsoluteFill style={{background: m.stock ?? INK.paper}}>
 			<Paper tint={m.stock} />
 			{sheet && <Press sheets={[sheet]} />}
-			<div style={{position: 'absolute', left: 48, top: 1016, height: 40, padding: '0 14px', background: m.stock ? INK.paper : '#FBF8F1', boxShadow: '0 2px 6px rgba(45,30,15,0.25)'}}>
-				<Slug x={14} y={10} text={`${m.id} · MACRO ${n + 1}/7 · ${m.label} · ${m.stock ? 'K ON O' : 'O 15° K 45°'} · 1 DOT = ${m.cell} PX`} size={17} />
-				<div style={{visibility: 'hidden', fontFamily: 'IBM Plex Mono', fontSize: 17, letterSpacing: '0.12em', whiteSpace: 'nowrap', lineHeight: '40px'}}>{`${m.id} · MACRO ${n + 1}/7 · ${m.label} · ${m.stock ? 'K ON O' : 'O 15° K 45°'} · 1 DOT = ${m.cell} PX`}</div>
+			<div style={{position: 'absolute', left: lx, top: ly, height: vertical ? 30 : 40, padding: vertical ? '0 10px' : '0 14px', background: m.stock ? INK.paper : '#FBF8F1', boxShadow: '0 2px 6px rgba(45,30,15,0.25)'}}>
+				<Slug x={vertical ? 10 : 14} y={vertical ? 8 : 10} text={`${m.id} · MACRO ${n + 1}/7 · ${m.label} · ${m.stock ? 'K ON O' : 'O 15° K 45°'} · 1 DOT = ${m.cell} PX`} size={ls} />
+				<div style={{visibility: 'hidden', fontFamily: 'IBM Plex Mono', fontSize: ls, letterSpacing: '0.12em', whiteSpace: 'nowrap', lineHeight: vertical ? '30px' : '40px'}}>{`${m.id} · MACRO ${n + 1}/7 · ${m.label} · ${m.stock ? 'K ON O' : 'O 15° K 45°'} · 1 DOT = ${m.cell} PX`}</div>
 			</div>
 		</AbsoluteFill>
 	);
@@ -222,7 +248,14 @@ const squeegee = (t: number): number => {
 	return x * STOP;
 };
 
-const p44Plates = (t: number, full = false): Plate[] => {
+// 9:16: a 607-px-wide window can't hold the 16:9 layout (Maya left, the blade upright through the middle, STILL over the
+// blue friends right), so on the phone every pull turns through 90 degrees: the plates are pulled from the top of the
+// sheet down (the cold wipe comes down the phone like a pull-down), orange and black stop at V_STOP just under Maya's
+// chin, the blade parks across the frame there and STILL is stamped big on the blue half below it.
+const V_STOP = 0.5;
+const V_STOP_Y = SY + V_STOP * P44S.h; // 498
+
+const p44Plates = (t: number, full = false, vertical = false): Plate[] => {
 	const frozen = t >= B.still;
 	const kicking = (b: number) => t >= b && t < b + 0.45;
 	const amp = kicking(B.kick1) || kicking(B.kick2) ? 7 : 2;
@@ -235,6 +268,21 @@ const p44Plates = (t: number, full = false): Plate[] => {
 	// behind the orange's edge it drops to the shadows only, or the overprint goes to mud
 	const behind = (u: number) => (hPull >= STOP ? 1 : clamp01((hPull - u) / 0.03));
 	const kPull = full ? 2 : squeegee(t);
+	if (vertical && !full) {
+		// the cold wipe comes down the phone faster: already past Maya's face (58% down) on the downbeat's own frame, so the
+		// section opens on her and not on bare paper, and down in 5 frames
+		const cY = clamp01((t - B.cold + 0.11) / 0.25) * 1.02;
+		const hY = t < B.heat - LEAD ? 0 : V_STOP * easeOut((t - B.heat + LEAD) / 0.26);
+		// the top half now holds the friends' faces too (the 16:9 keeps only Maya's side at half weight), so the cold plate
+		// prints at full weight until the orange comes down over it, then drops to the shadows behind its edge
+		const behindY = (v: number) => (hY >= V_STOP ? 1 : clamp01((hY - v) / 0.03));
+		return [
+			{ch: 2, ink: INK.cold, angle: 75, cell: 8.5, kind: 'line', pull: cY, pullY: true, dx: 2 + bx, dy: 1 + by, gain: 0.86, gamma: 1.2, mask: (_u, v) => (v < V_STOP ? lerp(1, 0.2, behindY(v)) : 1)},
+			// an unpulled plate prints nothing (a pull of 0 would still pass the row of dots on the sheet's top edge)
+			{ch: 1, ink: INK.heat, angle: 15, cell: 8.5, pull: hY > 0 ? hY : -1, pullY: true, dx: -1 + ox, dy: 2 + oy, gain: 0.95},
+			{ch: 0, ink: INK.key, angle: 45, cell: 8.5, pull: kPull > 0 ? (kPull / STOP) * V_STOP : -1, pullY: true, dx: kx, dy: ky, gain: 0.85, gamma: 1.2},
+		];
+	}
 	return [
 		{ch: 2, ink: INK.cold, angle: 75, cell: 8.5, kind: full ? 'dot' : 'line', pull: cPull, dx: 2 + bx, dy: 1 + by, gain: 0.86, gamma: 1.2, mask: (u) => (u < STOP ? lerp(0.5, 0.2, behind(u)) : 1)},
 		{ch: 1, ink: INK.heat, angle: 15, cell: 8.5, pull: hPull, dx: -1 + ox, dy: 2 + oy, gain: 0.95},
@@ -257,12 +305,38 @@ const STILL_MOVES: Move[] = [
 ];
 const stillCam = (t: number): Cam => (t >= B.still ? WIDE : beatHit(track(t, STILL_MOVES), t, B.cold, B.still));
 
+// 9:16: the rostrum camera frames for the phone (the vertical camera holds SEAM, so a window 607/s x 1080/s world px
+// wide round (cx, cy)). Frame px = 540 + (x - cx) * s * K_FILL, 960 + (y - cy) * s * K_FILL.
+// The freeze: Maya's face high (frame y ~535), the parked blade across the frame at y ~780, STILL below it (y 892-1547),
+// the flat Rule just under the sheet (y ~1640). The blast starts from this same view.
+const FREEZE_V: Pose = {cx: 860, cy: 600, s: 1, rot: 0};
+const STILL_MOVES_V: Move[] = [
+	{t: -1e9, to: {cx: 860, cy: 560, s: 0.92, rot: 0}, dur: 1}, // the cold wipe comes down the whole sheet, Maya centre left
+	{t: B.kick1, to: {cx: 1390, cy: 380, s: 1.3, rot: 0.5}, dur: 0.1}, // kick: in on Kai and Jess, full blue
+	{t: B.heat, to: {cx: 840, cy: 470, s: 1.05, rot: 0}, dur: 0.12}, // the orange pours down to the stop under her chin
+	{t: B.kick2, to: {cx: 790, cy: 395, s: 1.3, rot: -0.5}, dur: 0.1}, // kick: in on Maya, now in orange
+	{t: B.sq, to: {cx: 840, cy: 440, s: 1.1, rot: 0}, dur: 0.14}, // the squeegee comes in from the top
+	{t: B.step1, to: {cx: 790, cy: 350, s: 1.38, rot: -0.35}, dur: 0.12}, // the blade reaches her eyes: her face comes up black
+	{t: B.step2, to: {cx: 870, cy: 470, s: 1.12, rot: 0.25}, dur: 0.12},
+	{t: B.still, to: FREEZE_V, dur: 2 * FR}, // 'Still': snap to the freeze and stop
+];
+const stillCamV = (t: number): Cam => (t >= B.still ? FREEZE_V : beatHit(track(t, STILL_MOVES_V), t, B.cold, B.still));
+
 /** The squeegee: a rubber blade with a bead of ink pushed ahead of it. */
 const Squeegee: React.FC<{x: number; y: number; h: number}> = ({x, y, h}) => (
 	<div style={{position: 'absolute', left: x - 6, top: y - 60, width: 60, height: h + 120}}>
 		<div style={{position: 'absolute', left: 0, top: 56, width: 13, height: h + 8, background: INK.key, borderRadius: 6, mixBlendMode: 'multiply', ...inked(400, 0, 3)}} />
 		<div style={{position: 'absolute', left: 14, top: 0, width: 30, height: h + 120, background: 'linear-gradient(90deg, #2A2724 0%, #4A4540 35%, #1E1C1A 100%)', borderRadius: 4, boxShadow: '12px 0 24px rgba(40,25,10,0.38)'}} />
 		<div style={{position: 'absolute', left: 22, top: 0, width: 5, height: h + 120, background: 'rgba(255,255,255,0.14)'}} />
+	</div>
+);
+
+/** 9:16: the squeegee lying across the sheet, pulled down it (the bead on top, the rubber below, its shadow ahead). */
+const SqueegeeH: React.FC<{x: number; y: number; w: number}> = ({x, y, w}) => (
+	<div style={{position: 'absolute', left: x - 60, top: y - 6, width: w + 120, height: 60}}>
+		<div style={{position: 'absolute', top: 0, left: 56, height: 13, width: w + 8, background: INK.key, borderRadius: 6, mixBlendMode: 'multiply', ...inked(400, 3, 0)}} />
+		<div style={{position: 'absolute', top: 14, left: 0, height: 30, width: w + 120, background: 'linear-gradient(180deg, #2A2724 0%, #4A4540 35%, #1E1C1A 100%)', borderRadius: 4, boxShadow: '0 12px 24px rgba(40,25,10,0.38)'}} />
+		<div style={{position: 'absolute', top: 22, left: 0, height: 5, width: w + 120, background: 'rgba(255,255,255,0.14)'}} />
 	</div>
 );
 
@@ -282,6 +356,12 @@ const STILL_BOX = {x: SX + STOP * P44S.w + 62, w: P44S.w * (1 - STOP) - 62 - 26}
 const STILL_H = (STILL_BOX.w * 860) / STILL_W;
 const STILL_Y = P44S.cy - STILL_H / 2 + 6;
 
+// 9:16: STILL on the blue half below the parked blade, centred on the safe area's centre line at the freeze
+// (854 x 654 frame px, cap y 892-1547); it stamps from its top edge, so it grows away from the blade.
+const STILL_VH = 368;
+const STILL_VW = (STILL_VH * STILL_W) / 860;
+const STILL_V: React.CSSProperties = {left: FREEZE_V.cx + (500 - 540) / K_FILL - STILL_VW / 2, top: V_STOP_Y + 64, width: STILL_VW, height: STILL_VH, transformOrigin: '50% 0%'};
+
 const StillWord: React.FC<{s: number; style?: React.CSSProperties}> = ({s, style}) => (
 	<svg
 		viewBox={`44 84 ${STILL_W} 860`}
@@ -294,7 +374,20 @@ const StillWord: React.FC<{s: number; style?: React.CSSProperties}> = ({s, style
 );
 
 const SheetFurniture: React.FC<{t: number; frozen: boolean}> = ({t, frozen}) => {
+	const {vertical} = useStage();
 	const pull = t < B.heat ? 1 : t < B.sq ? 2 : 3;
+	if (vertical) {
+		return (
+			<>
+				<CropMarks x={SX} y={SY} w={P44S.w} h={P44S.h} />
+				<RegTarget x={FREEZE_V.cx} y={SY - 52} />
+				<Slug x={590} y={SY + P44S.h + 48} text={`P44 · PULL ${pull}/3 · ${pull === 1 ? 'U 75° LINE' : pull === 2 ? 'O 15°' : 'K 45°'} · ${frozen ? 'STOPPED' : 'RUNNING'}`} size={14} />
+				{/* the stop line, scored on the sheet's edges */}
+				<div style={{position: 'absolute', left: SX - 34, top: V_STOP_Y, width: 22, height: 0, borderTop: `1.5px solid ${INK.key}`}} />
+				<div style={{position: 'absolute', left: SX + P44S.w + 12, top: V_STOP_Y, width: 22, height: 0, borderTop: `1.5px solid ${INK.key}`}} />
+			</>
+		);
+	}
 	return (
 		<>
 			<CropMarks x={SX} y={SY} w={P44S.w} h={P44S.h} />
@@ -310,8 +403,9 @@ const SheetFurniture: React.FC<{t: number; frozen: boolean}> = ({t, frozen}) => 
 
 export const R9Pull: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P44']);
+	const {vertical} = useStage();
 	const frozen = t >= B.still;
-	const cam = stillCam(t);
+	const cam = vertical ? stillCamV(t) : stillCam(t);
 	const sq = squeegee(t);
 	const st = stamp(t, B.still);
 	return (
@@ -319,13 +413,22 @@ export const R9Pull: React.FC<{t: number}> = ({t}) => {
 			<CamLayer cam={cam}>
 				<Paper />
 			</CamLayer>
-			{d && <Press cam={cam} sheets={[{map: d.P44, ...P44S, plates: p44Plates(t), seed: 44}]} />}
-			<CamLayer cam={cam}>
-				<SheetFurniture t={t} frozen={frozen} />
-				<Rule x={SX + 640} y={SY + P44S.h + 46} w={P44S.w - 640} t={t} freeze={frozen ? B.still : undefined} alive={() => !frozen} amp={24} width={2.8} />
-				{t >= SQ_IN && <Squeegee x={SX + sq * P44S.w} y={SY} h={P44S.h} />}
-				{st.on && <StillWord s={st.s} />}
-			</CamLayer>
+			{d && <Press cam={cam} sheets={[{map: d.P44, ...P44S, plates: p44Plates(t, false, vertical), seed: 44}]} />}
+			{vertical ? (
+				<CamLayer cam={cam}>
+					<SheetFurniture t={t} frozen={frozen} />
+					<Rule x={590} y={SY + P44S.h + 26} w={530} t={t} freeze={frozen ? B.still : undefined} alive={() => !frozen} amp={24} width={2.8} />
+					{t >= SQ_IN && <SqueegeeH x={SX} y={SY + (sq / STOP) * V_STOP * P44S.h} w={P44S.w} />}
+					{st.on && <StillWord s={st.s} style={STILL_V} />}
+				</CamLayer>
+			) : (
+				<CamLayer cam={cam}>
+					<SheetFurniture t={t} frozen={frozen} />
+					<Rule x={SX + 640} y={SY + P44S.h + 46} w={P44S.w - 640} t={t} freeze={frozen ? B.still : undefined} alive={() => !frozen} amp={24} width={2.8} />
+					{t >= SQ_IN && <Squeegee x={SX + sq * P44S.w} y={SY} h={P44S.h} />}
+					{st.on && <StillWord s={st.s} />}
+				</CamLayer>
+			)}
 		</AbsoluteFill>
 	);
 };
@@ -545,7 +648,34 @@ const ROLL: RollDef[] = [
 ];
 const SHOVE = 0.2;
 
-const rollPose = (p: RollDef, t: number) => {
+// 9:16 (positions given in frame px, held in stage px as the SEAM camera sees them): each print lands big (0.9 scale,
+// 813 x 528 frame px), alternately below and above the word's middle band, the second of each pair on the first like
+// a deal; on the jump the word bumps the top pair up out of the frame ahead of it and the bottom pair is shoved into
+// the bottom corners, where they peek out under the keepsake.
+const FX = (x: number) => 960 + (x - 540) / K_FILL;
+const FY = (y: number) => 540 + (y - 960) / K_FILL;
+const SV = 0.9;
+type RollV = {at: [number, number, number]; corner: [number, number, number]; from: [number, number]; capRight: boolean; shove: number};
+const ROLL_V: Record<string, RollV> = {
+	P45: {at: [FX(500), FY(1490), -3], corner: [FX(270), FY(1610), -7], from: [-0.5, 1], capRight: false, shove: SHOVE},
+	P46: {at: [FX(590), FY(372), 3], corner: [FX(760), FY(-430), 10], from: [0.5, -1], capRight: true, shove: 0.13},
+	P47: {at: [FX(585), FY(1525), 3.5], corner: [FX(830), FY(1650), 6], from: [1, 0.55], capRight: true, shove: SHOVE},
+	P48: {at: [FX(490), FY(385), -2.5], corner: [FX(300), FY(-450), -10], from: [-1, -0.45], capRight: false, shove: 0.13},
+};
+
+const rollPose = (p: RollDef, t: number, vertical = false) => {
+	if (vertical) {
+		const v = ROLL_V[p.id];
+		const air = 1 - easeOut((t - p.t0 + LEAD) / (5 * FR));
+		const shove = easeOut((t - B.jump + LEAD) / v.shove);
+		return {
+			cx: lerp(v.at[0], v.corner[0], shove) + v.from[0] * 420 * air,
+			cy: lerp(v.at[1], v.corner[1], shove) + v.from[1] * 420 * air,
+			rot: lerp(v.at[2], v.corner[2], shove) + v.from[0] * 7 * air,
+			s: SV * (1 + 0.09 * air),
+			air: Math.max(air, t >= B.jump ? 0.25 * (1 - shove) : 0),
+		};
+	}
 	const air = 1 - easeOut((t - p.t0 + LEAD) / (5 * FR));
 	const shove = easeOut((t - B.jump + LEAD) / SHOVE);
 	const cx = lerp(p.at[0], p.corner[0], shove) + p.from[0] * 420 * air;
@@ -555,7 +685,9 @@ const rollPose = (p: RollDef, t: number) => {
 };
 
 const RollPrint: React.FC<{p: RollDef; t: number; map?: Density; n: number}> = ({p, t, map, n}) => {
-	const q = rollPose(p, t);
+	const {vertical} = useStage();
+	const q = rollPose(p, t, vertical);
+	const capRight = vertical ? ROLL_V[p.id].capRight : p.at[0] > 960;
 	const box = {w: RW + 2 * RB, h: RH + RB + RFOOT};
 	// the image centre sits (RFOOT - RB) / 2 above the centre of the paper
 	const r = (q.rot * Math.PI) / 180;
@@ -596,7 +728,7 @@ const RollPrint: React.FC<{p: RollDef; t: number; map?: Density; n: number}> = (
 				}}
 			>
 				{/* the caption sits at the outer end of the strip: the keepsake lands over the inner edges of the bottom two */}
-				<div style={{position: 'absolute', ...(p.at[0] > 960 ? {right: RB + 2} : {left: RB + 2}), top: RB + RH + 9, fontFamily: SERIF, fontStyle: 'italic', fontSize: 24, color: INK.key, opacity: 0.85, whiteSpace: 'nowrap'}}>
+				<div style={{position: 'absolute', ...(capRight ? {right: RB + 2} : {left: RB + 2}), top: RB + RH + 9, fontFamily: SERIF, fontStyle: 'italic', fontSize: 24, color: INK.key, opacity: 0.85, whiteSpace: 'nowrap'}}>
 					{p.cap}
 				</div>
 			</div>
@@ -614,12 +746,25 @@ const BLAST_MOVES: Move[] = [
 	{t: B.jump, to: {cx: 960, cy: 600, s: 0.5, rot: 0}, dur: 0.2},
 ];
 
+// 9:16: the blast starts from the freeze's own view (Maya's torso, where the dots blow from, at frame x ~310), jolts
+// to a new framing on each re-stamp, then pulls back for the deal like the 16:9
+const BLAST_MOVES_V: Move[] = [
+	{t: -1e9, to: FREEZE_V, dur: 1},
+	{t: B.rs2, to: {cx: 800, cy: 580, s: 1.14, rot: -0.6}, dur: 0.08},
+	// (cy 560 keeps the heat Rule's blips, frame y 1626 and down, clear of CING's foot through the whole hold)
+	{t: B.rs3, to: {cx: 900, cy: 560, s: 0.92, rot: 0.5}, dur: 0.08},
+	{t: B.rs4, to: {cx: 850, cy: 590, s: 1.04, rot: 0}, dur: 0.08},
+	{t: B.p45, to: {cx: 900, cy: 560, s: 0.56, rot: 0}, dur: 0.16},
+	{t: B.jump, to: {cx: 900, cy: 600, s: 0.5, rot: 0}, dur: 0.2},
+];
+
 export const Explosion: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P44', 'P45', 'P46', 'P47', 'P48']);
+	const {vertical} = useStage();
 	const dots = useMemo(() => (d ? explodeDots(d.P44) : []), [d]);
 	const tau = t - B.blast + 0.05; // the blast is already lifting the dots on the beat's own frame
 	const shake = tau < 0.35 ? Math.sin(tau * 95) * 12 * (1 - tau / 0.35) : 0;
-	const base = beatHit(track(t, BLAST_MOVES), t, B.blast, B.jump, 1.2);
+	const base = beatHit(track(t, vertical ? BLAST_MOVES_V : BLAST_MOVES), t, B.blast, B.jump, 1.2);
 	const cam: Cam = {...base, cx: base.cx + shake / base.s, cy: base.cy - (shake * 0.5) / base.s};
 	return (
 		<AbsoluteFill style={{background: INK.paper}}>
@@ -630,7 +775,8 @@ export const Explosion: React.FC<{t: number}> = ({t}) => {
 			{d && <Press cam={cam} sheets={[]} draw={(ctx) => drawBlast(ctx, dots, tau, cam)} />}
 			{ROLL.map((p, n) => (t >= p.t0 ? <RollPrint key={p.id} p={p} t={t} map={d?.[p.id]} n={n} /> : null))}
 			<KeepsakePrint t={t} />
-			<Word t={t} />
+			{/* 9:16: DANCING is re-laid in the frame itself (DancingV, the section's vextra), above everything */}
+			{!vertical && <Word t={t} />}
 		</AbsoluteFill>
 	);
 };
@@ -649,9 +795,9 @@ export const wordBox = (t: number) => {
 };
 
 /** Debug: the corners of each camera-roll print's paper at t (screen px), for checks against the word and the frame. */
-export const rollCorners = (t: number) =>
+export const rollCorners = (t: number, vertical = false) =>
 	ROLL.filter((p) => t >= p.t0).map((p) => {
-		const q = rollPose(p, t);
+		const q = rollPose(p, t, vertical);
 		const r = (q.rot * Math.PI) / 180;
 		const off = ((RFOOT - RB) / 2) * q.s;
 		const pcx = q.cx - Math.sin(r) * off;
@@ -662,5 +808,158 @@ export const rollCorners = (t: number) =>
 		return {id: p.id, pts};
 	});
 
+/* ----------------------------------------------------------------------------------------------------- */
+/* 9:16                                                                                                  */
+
+/*
+ * DANCING on the phone (frame px, drawn above the stage). It rhymes with the film's first DANCING on the phone (s_dancing:
+ * DAN over CING as a justified block): on the blast and its three re-stamps it is that block filling the safe area (670
+ * wide, caps 682 and 602, y 267-1573); on the pull-back the two halves fold into one line 860 wide (cap 404) across the
+ * middle while the camera roll is dealt above and below it; on 108.1 the line jumps whole to the top band (cap y 241-645)
+ * and the keepsake lands below. Same beats, inks, register steps and bounces as the 16:9 word; nothing is ever drawn on it.
+ */
+type Lay = {block: boolean; cx: number; cy: number; w: number};
+const VBLOCK: Lay = {block: true, cx: 510, cy: 920, w: 670};
+const VMID: Lay = {block: false, cx: 500, cy: 960, w: 860};
+const VTOP: Lay = {block: false, cx: 500, cy: 443, w: 860};
+const WORD_V: {lay: Lay; rot: number}[] = [
+	{lay: VBLOCK, rot: 0},
+	{lay: {...VBLOCK, cx: 498, cy: 930}, rot: -1.6},
+	{lay: {...VBLOCK, cx: 522, cy: 910}, rot: 1.2},
+	{lay: VBLOCK, rot: 0},
+	{lay: VMID, rot: 0},
+	{lay: VMID, rot: -1.2},
+	{lay: VMID, rot: 1},
+	{lay: VMID, rot: -0.6},
+	{lay: VTOP, rot: 0},
+	{lay: VTOP, rot: -0.8},
+	{lay: VTOP, rot: 0.8},
+	{lay: VTOP, rot: 0},
+];
+type Half = [number, number, number]; // frame position of a half's left cap corner, and its scale (frame px per unit)
+const halves = (l: Lay): {dan: Half; cing: Half; cap: number} => {
+	if (l.block) {
+		const sD = l.w / (888.8 - 44);
+		const sC = l.w / (1876 - 918.8);
+		const gap = 24 * (l.w / 714);
+		const top = l.cy - (DH * sD + gap + DH * sC) / 2;
+		const x0 = l.cx - l.w / 2;
+		return {dan: [x0, top, sD], cing: [x0, top + DH * sD + gap, sC], cap: DH * sD};
+	}
+	const sc = l.w / DW;
+	const x0 = l.cx - l.w / 2;
+	const top = l.cy - (DH * sc) / 2;
+	return {dan: [x0, top, sc], cing: [x0 + (918.8 - 44) * sc, top, sc], cap: DH * sc};
+};
+
+const wordAtV = (t: number) => {
+	// a key that moves (the fold, the jump) starts LEAD early with the camera, the shoved prints and the keepsake, so on
+	// 198.283 the pulling-back camera doesn't lift the heat Rule through CING's foot before the block has begun to fold
+	let i = 0;
+	while (i + 1 < WORD.length && WORD[i + 1].t - (WORD[i + 1].move ? LEAD : 0) <= t) i++;
+	const k = WORD[i];
+	const p = i > 0 ? WORD[i - 1] : k;
+	const kv = WORD_V[i];
+	const pv = i > 0 ? WORD_V[i - 1] : kv;
+	const dt = t - k.t;
+	let at = halves(kv.lay);
+	let {cx, cy} = kv.lay;
+	let rot = kv.rot;
+	let w16 = k.w; // the 16:9 word's width at the same point of the move, for scaling its register steps
+	if (k.move) {
+		const dm = dt + LEAD;
+		// the jump overshoots by 4% (the 16:9's 11% would lift the caps to frame y 183, into the feed's top bar)
+		const e = k.jump ? backOut(dm / k.move, 1) : easeOut(dm / k.move);
+		const from = halves(pv.lay);
+		const mix = (a: Half, b: Half, ex: number, ey: number, es: number): Half => [lerp(a[0], b[0], ex), lerp(a[1], b[1], ey), a[2] * Math.pow(b[2] / a[2], es)];
+		if (k.jump) {
+			const es = clamp01(easeOut(dm / k.move));
+			at = {dan: mix(from.dan, at.dan, e, e, es), cing: mix(from.cing, at.cing, e, e, es), cap: lerp(from.cap, at.cap, es)};
+			w16 = p.w * Math.pow(k.w / p.w, es);
+		} else {
+			// the block folds into a line: both halves shrink and CING slides right first, while DAN drops into its place
+			// late, so the two never cross
+			const fast = easeOut(dm / (0.5 * k.move));
+			at = {dan: mix(from.dan, at.dan, fast, e * e, fast), cing: mix(from.cing, at.cing, fast, e, fast), cap: lerp(from.cap, at.cap, fast)};
+			w16 = p.w * Math.pow(k.w / p.w, fast);
+		}
+		cx = lerp(pv.lay.cx, cx, e);
+		cy = lerp(pv.lay.cy, cy, e);
+		rot = lerp(pv.rot, rot, e);
+	}
+	// the register steps of the 16:9 word, scaled from its cap height to this one
+	const f = at.cap / ((w16 * DH) / DW);
+	const step = easeOut(dt / (3 * FR));
+	const reg = (a: [number, number] | null, b: [number, number] | null): [number, number] | null => {
+		if (!b) return null;
+		if (!a || k.heat === null || p.heat === null) return b;
+		return [lerp(a[0], b[0], step), lerp(a[1], b[1], step)];
+	};
+	const key = reg(p.key, k.key);
+	const heat = reg(p.heat, k.heat);
+	const bounce = k.punch * Math.exp(-Math.max(0, dt) / 0.075);
+	const imps: Imp[] = [];
+	if (heat) imps.push({ink: INK.heat, dx: heat[0] * f, dy: heat[1] * f});
+	if (key) imps.push({ink: INK.key, dx: key[0] * f, dy: key[1] * f});
+	return {at, cx, cy, rot, s: 1 + bounce, hop: -bounce * 0.15 * at.cap, imps};
+};
+
+const DancingV: React.FC<{t: number}> = ({t}) => {
+	if (t < B.blast || t >= F.dawn) return null;
+	const {at, cx, cy, rot, s, hop, imps} = wordAtV(t);
+	const half = (h: Half, paths: string[], ax: number) => (
+		<g transform={`translate(${h[0]} ${h[1]}) scale(${h[2]}) translate(${-ax} -84)`}>
+			{paths.map((d, j) => (
+				<path key={j} d={d} />
+			))}
+		</g>
+	);
+	return (
+		<svg viewBox="0 0 1080 1920" style={{position: 'absolute', left: 0, top: 0, width: 1080, height: 1920, overflow: 'visible', mixBlendMode: 'multiply', ...inked(1000, 23, 51, true)}}>
+			<g transform={`translate(0 ${hop}) rotate(${rot} ${cx} ${cy}) translate(${cx} ${cy}) scale(${s}) translate(${-cx} ${-cy})`}>
+				{imps.map((im, n) => (
+					<g key={n} transform={`translate(${im.dx} ${im.dy})`} fill={im.ink} style={{mixBlendMode: 'multiply'}}>
+						{half(at.dan, DANCING_PATHS.slice(0, 3), 44)}
+						{half(at.cing, DANCING_PATHS.slice(3), 918.8)}
+					</g>
+				))}
+			</g>
+		</svg>
+	);
+};
+
+/** Debug (9:16): DANCING's ink box in frame px at t, rotation, bounce and register offsets included. */
+export const wordBoxV = (t: number) => {
+	const {at, cx, cy, rot, s, hop, imps} = wordAtV(t);
+	const pts: [number, number][] = [];
+	for (const [h, a0, a1] of [
+		[at.dan, 44, 888.8],
+		[at.cing, 918.8, 1876],
+	] as const) {
+		for (const [ux, uy] of [
+			[a0, 84],
+			[a1, 84],
+			[a0, 944],
+			[a1, 944],
+		]) {
+			pts.push([h[0] + (ux - a0) * h[2], h[1] + (uy - 84) * h[2]]);
+		}
+	}
+	const r = (rot * Math.PI) / 180;
+	const ox = Math.max(0, ...imps.map((im) => Math.abs(im.dx)));
+	const oy = Math.max(0, ...imps.map((im) => Math.abs(im.dy)));
+	const tp = pts.map(([x, y]) => {
+		const X = cx + (x - cx) * s;
+		const Y = cy + (y - cy) * s;
+		return [cx + (X - cx) * Math.cos(r) - (Y - cy) * Math.sin(r), cy + (X - cx) * Math.sin(r) + (Y - cy) * Math.cos(r) + hop];
+	});
+	return {x0: Math.min(...tp.map((q) => q[0])) - ox, y0: Math.min(...tp.map((q) => q[1])) - oy, x1: Math.max(...tp.map((q) => q[0])) + ox, y1: Math.max(...tp.map((q) => q[1])) + oy};
+};
+
+/** The phone looks through SEAM throughout these three sections: each one frames itself on its 16:9 stage (the macro
+ *  crops, the rostrum camera of the pull and the blast, the deal laid out in SEAM's window), so the vertical camera
+ *  only has to hold still, and every boundary, Hoist's and Dawn's included, meets on SEAM. */
+const SEAM: Frame = {k: K_FILL, x: 960, y: 540};
+
 /** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
-export const V: VMap = {};
+export const V: VMap = {Macros: {v: () => SEAM}, R9Pull: {v: () => SEAM}, Explosion: {v: () => SEAM, vextra: DancingV}};

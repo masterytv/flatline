@@ -11,7 +11,7 @@ import {Cam, Plate, Sheet} from './press';
 import {CamLayer, Paper, Press} from './Press';
 import {P1_PLATES, POSTER, posterSheet, sheetCam, SheetMarks, WIRE_Y} from './s_drop';
 import {MonoText, P, Part, PartShape, PartState} from './s_hand_parts';
-import {VMap} from './stage';
+import {bleed, Frame, K_FILL, useStage, VMap, vtrack} from './stage';
 
 // 1:24.8 to 1:32.2 (bars 45-48): GRAFT 1, Uninstall's drop-1 hand-over printed in Proof of Life's inks.
 // The phone shatters on a cream flash. Its 56 shards (the frozen kick-out screen: O27 under the Clear! crack, now
@@ -91,6 +91,12 @@ const notches = (t: number) => OPEN_STEPS.reduce((s, b) => s + (t >= b ? outBack
 
 /** Bar 45 frames P1 ~1.4x closer than the cover, so the gap prints it on a finer screen (same ~10 px on screen). */
 const HOLE_CELL = 5.6;
+/**
+ * 9:16: the camera is in 1.8x closer than the 16:9 frame, so P1 prints on a screen half as fine (about 9-12 px dots on
+ * the phone, where the faces still read through the windows), coarsening back to the 16:9 screen as the windows join,
+ * so Progs takes over the same print.
+ */
+const vCell = (t: number) => (t < FLY ? 0.5 : lerp(0.5, 1, easeInOut(seg(t, FLY, END))));
 
 const camAt = (t: number): Cam => {
 	// bar 45: the phone-shaped gap frames P1 top to bottom: the lantern at the top, the raised hands, Jess laughing
@@ -423,6 +429,45 @@ const N = SLOTS.length;
 const COLUMN_ORDER = [12, 0, 5, 14, 9, 1, 16, 6, 18, 2, 10, 15, 3, 17, 8, 13, 4, 7, 19, 11, 20, 21, 22, 23];
 const TEXTY = ['clock', 'seen'];
 
+/**
+ * The 9:16 exploded view, the phone's own portrait: where each part lands at full spread (screen X, Y and scale S on
+ * the stage, inside the 607 px window the vertical camera fills the frame with), in SLOTS order. The status bar's
+ * icons across the top, two banners, the app in the middle on the wire with the likes round it, three banners below.
+ * Converted back through each part's depth, so the projection lands them exactly there.
+ */
+const V_FINAL: [number, number, number][] = [
+	[905, 185, 0.95],
+	[1040, 290, 0.9],
+	[880, 830, 0.9],
+	[1020, 925, 0.95],
+	[920, 1012, 0.9],
+	[780, 420, 1.9],
+	[1150, 640, 1.6],
+	[1185, 520, 1.25],
+	[720, 540, 1.4],
+	[1135, 385, 1.5],
+	[1000, 655, 1.4],
+	[905, 70, 0.85],
+	[960, 545, 1.2],
+	[1140, 745, 1.2],
+	[760, 315, 1.1],
+	[975, 455, 1.05],
+	[905, 750, 0.95],
+	[1195, 75, 1.4],
+	[800, 635, 1],
+	[1215, 860, 1],
+	[725, 780, 1],
+	[1130, 800, 1],
+	[1060, 70, 1.3],
+	[725, 70, 1.3],
+];
+type SlotPos = {x: number; y: number; z: number; s: number};
+const V_SLOTS: SlotPos[] = V_FINAL.map(([X, Y, S], i) => {
+	const z = SLOTS[i].z;
+	const k = 1600 / (1600 - z);
+	return {x: W / 2 + (X - W / 2) / k, y: H / 2 + (Y - H / 2) / k, z, s: S / k};
+});
+
 type Pose = {
 	x: number;
 	y: number;
@@ -471,10 +516,26 @@ const stepsIn = (b: number, t: number) => {
 	return s;
 };
 
+/**
+ * Where the layouts put things: the 16:9 stage's, and the 9:16 cut's re-layout (the exploded view as a portrait, the
+ * feed a full-width column, the loop round the phone's own edge), since a camera alone can't hold them on the phone.
+ */
+type Lay = {
+	vertical: boolean;
+	slots: SlotPos[];
+	/** the feed column's zigzag, its parts' size cap and fit, and the slot rulers either side */
+	feed: {dx: number; cap: number; fit: number; rulers: [number, number]};
+	/** the title block's top-left corner */
+	title: [number, number];
+};
+const LAY_H: Lay = {vertical: false, slots: SLOTS, feed: {dx: 110, cap: 3.2, fit: 640, rulers: [505, 1415]}, title: [36, 1024]};
+const LAY_V: Lay = {vertical: true, slots: V_SLOTS, feed: {dx: 28, cap: 2.5, fit: 440, rulers: [672, 1248]}, title: [690, 952]};
+
 /** Bar 46, the exploded diagram: out from the axis a step per beat, creeping outward and turning between. */
-const exploded = (i: number, s: number): Pose => {
-	const sl = SLOTS[i];
-	const k = 0.7 + 0.1 * s;
+const exploded = (L: Lay, i: number, s: number): Pose => {
+	const sl = L.slots[i];
+	// (9:16: the portrait is tighter, so it starts further out and spreads less)
+	const k = L.vertical ? 0.85 + 0.05 * s : 0.7 + 0.1 * s;
 	return {
 		x: W / 2 + (sl.x - W / 2) * k,
 		y: H / 2 + (sl.y - H / 2) * k,
@@ -487,14 +548,14 @@ const exploded = (i: number, s: number): Pose => {
 
 /** Bar 47, the feed: one column scrolling up a 250 px slot per beat. Wraps only between two off-frame positions. */
 const SLOT_H = 250;
-const feed = (i: number, s: number): Pose => {
+const feed = (L: Lay, i: number, s: number): Pose => {
 	const c = COLUMN_ORDER.indexOf(i);
 	const pos = wrap(c - 3 - s, -8, N); // y from -1460 to 4540: both ends off frame, so a wrap never shows
 	return {
-		x: W / 2 + (c % 2 ? 110 : -110),
+		x: W / 2 + (c % 2 ? L.feed.dx : -L.feed.dx),
 		y: H / 2 + pos * SLOT_H,
 		z: (c % 3) * 80 - 80,
-		s: Math.min(3.2, 640 / maxDim(SLOTS[i].p)),
+		s: Math.min(L.feed.cap, L.feed.fit / maxDim(SLOTS[i].p)),
 		rot: (c % 2 ? 1 : -1) * 2.5,
 		rotY: 0,
 	};
@@ -568,11 +629,84 @@ const ring = (i: number, s: number, t: number): Pose => {
 	};
 };
 
-const layout = (b: number, i: number, s: number, t: number) => (b === 0 ? exploded(i, s) : b === 1 ? feed(i, s) : ring(i, s, t));
+/**
+ * 9:16, bar 48: the loop runs round the phone's own edge, a rounded rectangle just inside the frame, an eighth of the
+ * way round per beat (45°, as the ring turns), creeping on between. Spaced by arc length, so the long sides carry most
+ * of the parts and none overlap; on each beat the loop changes shape (narrower or taller, its corners rounder or
+ * squarer, tilted, its top or its bottom swinging toward the lens).
+ */
+type LoopShape = {hw: number; hh: number; r: number; rot: number; tz: number};
+/**
+ * Narrow enough that a part on the long sides (half a card, 53 px), tilted and punched on a kick, stays inside the
+ * 607 px window (wider, the clock, the logo and the banners were cut by the frame's edges); centred a touch left of
+ * the stage, away from the feed's buttons. Each shape's perimeter holds the parts' needs (about 2360 px).
+ */
+const LOOP_X = 952;
+const LOOP_SHAPES: LoopShape[] = [
+	{hw: 214, hh: 450, r: 150, rot: 0, tz: 60},
+	{hw: 208, hh: 458, r: 180, rot: -3, tz: -70},
+	{hw: 218, hh: 442, r: 110, rot: 2.5, tz: 80},
+	{hw: 212, hh: 455, r: 165, rot: -1.5, tz: -55},
+];
+const loopFit = (p: Part) => Math.min(1.4, 105 / maxDim(p));
+const LOOP_GAP = 4;
+const LOOP_NEED = COLUMN_ORDER.map((i) => Math.max(SLOTS[i].p.w, SLOTS[i].p.h) * loopFit(SLOTS[i].p) + LOOP_GAP);
+const LOOP_TOTAL = LOOP_NEED.reduce((a, b) => a + b, 0);
+/** Each part's place round the loop: the fraction of the way round from the top centre, clockwise, in the feed's order. */
+const LOOP_U = LOOP_NEED.map((l, c) => (LOOP_NEED.slice(0, c).reduce((a, b) => a + b, 0) + l / 2) / LOOP_TOTAL);
+const loopShape = (t: number): LoopShape => {
+	const {i: n, dt} = since(t, BAR_BEATS[2]);
+	if (n <= 0) return LOOP_SHAPES[0];
+	const a = LOOP_SHAPES[n - 1];
+	const b = LOOP_SHAPES[n];
+	const e = outBack(dt / 0.18);
+	return {hw: lerp(a.hw, b.hw, e), hh: lerp(a.hh, b.hh, e), r: lerp(a.r, b.r, e), rot: lerp(a.rot, b.rot, e), tz: lerp(a.tz, b.tz, e)};
+};
+/** The point a fraction u of the way round a rounded rectangle, clockwise from its top centre, about its centre. */
+const loopPoint = (q: LoopShape, u: number): [number, number] => {
+	const a = q.hw - q.r;
+	const b = q.hh - q.r;
+	const arc = (Math.PI / 2) * q.r;
+	const corner = (cx: number, cy: number, th0: number) => (k: number): [number, number] => [cx + q.r * Math.cos(th0 + k / q.r), cy + q.r * Math.sin(th0 + k / q.r)];
+	const run: [number, (k: number) => [number, number]][] = [
+		[a, (k) => [k, -q.hh]],
+		[arc, corner(a, -b, -Math.PI / 2)],
+		[2 * b, (k) => [q.hw, -b + k]],
+		[arc, corner(a, b, 0)],
+		[2 * a, (k) => [a - k, q.hh]],
+		[arc, corner(-a, b, Math.PI / 2)],
+		[2 * b, (k) => [-q.hw, b - k]],
+		[arc, corner(-a, -b, Math.PI)],
+		[a, (k) => [-a + k, -q.hh]],
+	];
+	let d = wrap(u, 0, 1) * (4 * a + 4 * b + 4 * arc);
+	for (const [len, at] of run) {
+		if (d <= len) return at(d);
+		d -= len;
+	}
+	return [0, -q.hh];
+};
+const loop = (i: number, s: number, t: number): Pose => {
+	const c = COLUMN_ORDER.indexOf(i);
+	const q = loopShape(t);
+	const [lx, ly] = loopPoint(q, LOOP_U[c] + s / 8);
+	const r = (q.rot * Math.PI) / 180;
+	return {
+		x: LOOP_X + lx * Math.cos(r) - ly * Math.sin(r),
+		y: H / 2 + lx * Math.sin(r) + ly * Math.cos(r),
+		z: (ly / q.hh) * q.tz,
+		s: loopFit(SLOTS[i].p),
+		rot: q.rot,
+		rotY: 0,
+	};
+};
+
+const layout = (L: Lay, b: number, i: number, s: number, t: number) =>
+	b === 0 ? exploded(L, i, s) : b === 1 ? feed(L, i, s) : L.vertical ? loop(i, s, t) : ring(i, s, t);
 
 /** The spill (85.705 to 86.634): out of the phone through the cracks, with drag. */
-const spillPose = (i: number, t: number): Pose => {
-	const sl = SLOTS[i];
+const spillPose = (L: Lay, i: number, t: number): Pose => {
+	const sl = L.slots[i];
 	const drag = 1 - Math.exp(-3.5 * Math.max(0, t - SPILL));
 	const k = 0.08 + 0.4 * drag;
 	return {
@@ -586,12 +720,12 @@ const spillPose = (i: number, t: number): Pose => {
 };
 
 /** Each part in its bar's layout; on each bar's downbeat it flips like a card into the new one. */
-const settled = (i: number, t: number): Pose => {
-	if (t < T.end) return spillPose(i, t);
+const settled = (L: Lay, i: number, t: number): Pose => {
+	if (t < T.end) return spillPose(L, i, t);
 	const b = t < BAR_T[1] ? 0 : t < BAR_T[2] ? 1 : 2;
-	const here = layout(b, i, stepsIn(b, t), t);
+	const here = layout(L, b, i, stepsIn(b, t), t);
 	const dt = t - BAR_T[b];
-	const prev = b === 0 ? spillPose(i, T.end) : layout(b - 1, i, 3, BAR_T[b] - 1e-4);
+	const prev = b === 0 ? spillPose(L, i, T.end) : layout(L, b - 1, i, 3, BAR_T[b] - 1e-4);
 	const q = lerpPose(prev, here, outBack(dt / 0.18, 1.7));
 	q.rotY = 180 * clamp01(dt / 0.16);
 	return q;
@@ -601,11 +735,11 @@ const settled = (i: number, t: number): Pose => {
 const PAST_LENS = 1600 - 1600 / 7;
 
 /** Where each part is at t (shared by the flood's mask and the drawing, so the windows align exactly). */
-const partPose = (i: number, t: number): Pose => {
-	if (t < FLY) return settled(i, t);
+const partPose = (L: Lay, i: number, t: number): Pose => {
+	if (t < FLY) return settled(L, i, t);
 	// 91.940: they fly at the lens, converging on its axis; ease-out, so the cue frame itself jumps
 	const k = 1 - Math.pow(1 - seg(t, FLY, FLY + 0.16), 3);
-	const q = settled(i, FLY - 1e-4);
+	const q = settled(L, i, FLY - 1e-4);
 	return {
 		x: lerp(q.x, W / 2 + (q.x - W / 2) * 0.12, k),
 		y: lerp(q.y, H / 2 + (q.y - H / 2) * 0.12, k),
@@ -658,6 +792,9 @@ const dotScreen = (cell: number, r: number, holes: boolean): React.CSSProperties
 
 // ------------------------------------------------------------------------------------------------ the 1:24 FLATLINE, carried over
 
+/** 9:16: the opening's vertical cut sets FLAT / LINE at 200 px on the 1080 px frame; the word carries on at that size. */
+const V_TYPE = 200;
+
 /** The opening's FlatlineType after the drop: same face, size, place and shake; it fades out 85.54-86.43 as it did. */
 const typeState = (t: number) => {
 	const n = Math.floor(t * 30);
@@ -675,7 +812,9 @@ const FlatlineWord: React.FC<{
 	color?: string;
 	paper?: boolean;
 	style?: React.CSSProperties;
-}> = ({t, color, paper, style}) => {
+	/** 9:16: the word stacked FLAT / LINE as the opening's vertical cut set it, at this size (stage px) */
+	stack?: number;
+}> = ({t, color, paper, style, stack}) => {
 	const {sx, sy, out} = typeState(t);
 	return (
 		<AbsoluteFill
@@ -689,9 +828,9 @@ const FlatlineWord: React.FC<{
 				style={{
 					fontFamily: DISPLAY_FONT,
 					fontWeight: 700,
-					fontSize: 300,
-					letterSpacing: -9,
-					lineHeight: 1,
+					fontSize: stack ?? 300,
+					letterSpacing: stack ? -stack * 0.03 : -9,
+					lineHeight: stack ? 0.9 : 1,
 					textAlign: 'center',
 					transform: `scale(${1 + 0.08 * out})`,
 					whiteSpace: 'nowrap',
@@ -709,7 +848,15 @@ const FlatlineWord: React.FC<{
 					...style,
 				}}
 			>
-				FLATLINE
+				{stack ? (
+					<>
+						FLAT
+						<br />
+						LINE
+					</>
+				) : (
+					'FLATLINE'
+				)}
 			</div>
 		</AbsoluteFill>
 	);
@@ -718,12 +865,12 @@ const FlatlineWord: React.FC<{
 // ------------------------------------------------------------------------------------------------ bar 47's slot rulers
 
 /** Two rulers either side of the feed column, ticked every 50 px and numbered per slot, scrolling with it. */
-const FeedRulers: React.FC<{s: number}> = ({s}) => {
+const FeedRulers: React.FC<{s: number; at: [number, number]}> = ({s, at}) => {
 	const off = s * SLOT_H;
 	const ticks: React.ReactNode[] = [];
 	for (const [x, dir] of [
-		[505, 1],
-		[1415, -1],
+		[at[0], 1],
+		[at[1], -1],
 	] as const) {
 		ticks.push(<line key={`l${x}`} x1={x} y1={0} x2={x} y2={H} stroke={INK.paper} strokeWidth={1} opacity={0.32} />);
 		// tick k sits at slot k/5 of the column (a major tick on each slot centre)
@@ -753,7 +900,12 @@ const TITLES: [number, string][] = [
 
 export const HandOver: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P1', 'O27']);
+	// 9:16: the re-laid-out parts, the word stacked to fit the phone, the wire at the opening's frame width
+	const {vertical} = useStage();
 	const cam = camAt(t);
+	const L = vertical ? LAY_V : LAY_H;
+	const stack = vertical ? V_TYPE / K_FILL : undefined;
+	const thin = vertical ? 1 / K_FILL : 1;
 
 	// P1 on the press: in both inks, the orange plate landing off register on the drop and settling; every kick nudges
 	const settle = 10 * Math.exp(-(t - T.drop) / 0.35);
@@ -777,11 +929,12 @@ export const HandOver: React.FC<{t: number}> = ({t}) => {
 
 	const spilled = t >= SPILL;
 	const flying = t >= FLY;
-	const poses = SLOTS.map((_, i) => partPose(i, t));
+	const poses = SLOTS.map((_, i) => partPose(L, i, t));
 	const order = SLOTS.map((_, i) => i).sort((a, b) => poses[a].z - poses[b].z);
 	const win = spilled ? windowAt(t) : {open: false, punch: 0, dil: 0};
 	const extra = 1 + 0.12 * win.punch;
 	const phoneHole = t < T.end;
+	const onP1 = phoneHole ? plates.map((p) => ({...p, cell: HOLE_CELL})) : plates;
 	// the windows have swallowed the flood: from here it is one sheet
 	const joined = t >= FLY_JOIN;
 	const inFeed = t >= BAR_T[1] && t < BAR_T[2];
@@ -798,9 +951,15 @@ export const HandOver: React.FC<{t: number}> = ({t}) => {
 
 	// the wire: the opening's lime rule (6 px, glowing) settling to Progs' 4 px ink line
 	const wk = easeOut(seg(t, T.drop, T.drop + 0.6));
-	const wireW = lerp(6, 4, wk);
+	const wireW = lerp(6 * thin, 4, wk);
 
 	const title = [...TITLES].reverse().find(([at]) => t >= at);
+	// the title block: 16:9 bottom left; 9:16 bottom left, and for the loop a two-line caption centred inside it under
+	// the wire (one line would be wider than the loop's inside and run into its parts)
+	const inLoop = vertical && t >= BAR_T[2];
+	const tb = inLoop ? {x: LOOP_X, y: 560, size: 14} : {x: L.title[0], y: L.title[1], size: 16};
+	const tk = tb.size / 16;
+	const titleLines = !title ? [] : inLoop ? ['TOKTIC 4.2  ·  FIG. 3', 'THE LOOP  ·  45° / BEAT'] : [title[1]];
 	const leaders = t >= T.end && t < bt(47) ? 1 - seg(t, bt(46, 4), bt(47)) : 0;
 
 	return (
@@ -809,7 +968,7 @@ export const HandOver: React.FC<{t: number}> = ({t}) => {
 			<CamLayer cam={cam}>
 				<Paper />
 			</CamLayer>
-			{d && <Press cam={cam} sheets={[posterSheet(d.P1, phoneHole ? plates.map((p) => ({...p, cell: HOLE_CELL})) : plates)]} />}
+			{d && <Press cam={cam} sheets={[posterSheet(d.P1, vertical ? onP1.map((p) => ({...p, cell: p.cell * vCell(t)})) : onP1)]} />}
 			<CamLayer cam={cam}>
 				<SheetMarks code="K+O" />
 			</CamLayer>
@@ -850,12 +1009,12 @@ export const HandOver: React.FC<{t: number}> = ({t}) => {
 					top: WIRE_Y - wireW / 2,
 					height: wireW,
 					background: INK.lime,
-					boxShadow: wk < 1 ? `0 0 ${(24 * (1 - wk)).toFixed(1)}px ${INK.lime}` : undefined,
+					boxShadow: wk < 1 ? `0 0 ${(24 * thin * (1 - wk)).toFixed(1)}px ${INK.lime}` : undefined,
 				}}
 			/>
 
 			{/* the 1:24 FLATLINE, knocked out of the flood to bare paper, dissolving into a halftone (the spill bursts over it) */}
-			{t < T.end && <FlatlineWord t={t} paper style={tr > 0.2 ? dotScreen(TC, tr, true) : undefined} />}
+			{t < T.end && <FlatlineWord t={t} paper stack={stack} style={tr > 0.2 ? dotScreen(TC, tr, true) : undefined} />}
 
 			{/* the parts, the exploded view's leaders, the feed's rulers and ghosts, and the title block */}
 			{spilled && (
@@ -893,29 +1052,41 @@ export const HandOver: React.FC<{t: number}> = ({t}) => {
 					)}
 					{inFeed && (
 						<g>
-							<FeedRulers s={feedSteps} />
-							<g opacity={0.34}>
-								{([-1, 1] as const).flatMap((side) =>
-									SLOTS.map((sl, i) => {
-										const q = ghost(side, i, feedSteps);
-										if (q.y < -200 || q.y > H + 200) return null;
-										return (
-											<g key={`${side}-${i}`} transform={transformOf(q)}>
-												<PartShape p={sl.p} mode="edge" s={st} edgeW={1.2} edgeInk={INK.paper} />
-											</g>
-										);
-									}),
-								)}
-							</g>
+							<FeedRulers s={feedSteps} at={L.feed.rulers} />
+							{/* the other feeds (9:16: they would sit off the phone's edges) */}
+							{!vertical && (
+								<g opacity={0.34}>
+									{([-1, 1] as const).flatMap((side) =>
+										SLOTS.map((sl, i) => {
+											const q = ghost(side, i, feedSteps);
+											if (q.y < -200 || q.y > H + 200) return null;
+											return (
+												<g key={`${side}-${i}`} transform={transformOf(q)}>
+													<PartShape p={sl.p} mode="edge" s={st} edgeW={1.2} edgeInk={INK.paper} />
+												</g>
+											);
+										}),
+									)}
+								</g>
+							)}
 						</g>
 					)}
 					{title && t < FLY && (
 						<g>
 							{/* the title block sits on its own key plate, so the feed's ghosts scroll under it (the parts pass over) */}
-							<rect x={36} y={1024} width={title[1].replace(/\s+/g, ' ').length * 11.6 + 24} height={30} fill={INK.key} />
-							<MonoText x={48} y={1046} size={16} fill={INK.paper}>
-								{title[1]}
-							</MonoText>
+							{titleLines.map((line, k) => {
+								const w = line.replace(/\s+/g, ' ').length * 11.6 * tk + 24 * tk;
+								const x = inLoop ? tb.x - w / 2 : tb.x;
+								const y = tb.y + k * 30 * tk;
+								return (
+									<g key={k}>
+										<rect x={x} y={y} width={w} height={30 * tk} fill={INK.key} />
+										<MonoText x={x + 12 * tk} y={y + 22 * tk} size={tb.size} fill={INK.paper}>
+											{line}
+										</MonoText>
+									</g>
+								);
+							})}
 						</g>
 					)}
 					{order.map((i) => {
@@ -953,7 +1124,7 @@ export const HandOver: React.FC<{t: number}> = ({t}) => {
 							}}
 						/>
 					</AbsoluteFill>
-					<FlatlineWord t={t} color={INK.key} style={inked(900, 31, 7, true)} />
+					<FlatlineWord t={t} color={INK.key} stack={stack} style={inked(900, 31, 7, true)} />
 					<div
 						style={{
 							position: 'absolute',
@@ -970,5 +1141,47 @@ export const HandOver: React.FC<{t: number}> = ({t}) => {
 	);
 };
 
+// ------------------------------------------------------------------------------------------------ 9:16
+
+/** The seam with Progs (another group's section): the full-bleed frame on the stage centre. */
+const SEAM: Frame = {k: K_FILL, x: 960, y: 540};
+/** A frame in the dark: the key carries on past the stage's edges. */
+const dark = (x: number, y: number, k: number): Frame => ({...bleed(x, y, k), bg: INK.key});
+/** Full bleed on the stage centre: the phone-shaped gap, then each layout whole. */
+const FULL = dark(960, 540, K_FILL);
+/** A kick held by the camera: on t0 it lands 6% tight and settles back onto `f` in 0.16 s. */
+const hit = (t0: number, f: Frame): [number, Frame, number?][] => [
+	[t0, {...f, k: f.k * 1.06}],
+	[t0 + 0.16, f, 0.16],
+];
+
+/**
+ * The 9:16 camera. Bar 45 opens on the opening's last frame: the phone filling the frame, FLAT / LINE over it at the
+ * same size, the wire through the gap between the lines. It stays full bleed (pulled back, the stage's edges and the
+ * glass's would show), takes the first lime catch as a kick, and on the spill punches in to put the type and the parts
+ * high and Jess laughing low, then back out for the second catch. The exploded view whole on its downbeat, the status
+ * bar and the banners up close, the app and the banners below, whole again. The feed whole (a kick on its second
+ * scroll), then in close for its last two scrolls; the loop whole on the downbeat, a kick on each beat after. On 1:32's
+ * half-beat the parts fly at the lens with the camera on the seam.
+ */
+const HAND_V = vtrack([
+	[T.drop, FULL],
+	...hit(bt(45, 2), FULL),
+	[SPILL, dark(960, 700, 2.1)],
+	[bt(45, 4), FULL],
+	[bt(46), FULL],
+	[bt(46, 2), dark(960, 330, 2.4)],
+	[bt(46, 3), dark(960, 760, 2.4)],
+	[bt(46, 4), FULL],
+	[bt(47), FULL],
+	...hit(bt(47, 2), FULL),
+	[bt(47, 3), dark(960, 540, 2)],
+	[bt(48), FULL],
+	...hit(bt(48, 2), FULL),
+	...hit(bt(48, 3), FULL),
+	...hit(bt(48, 4), FULL),
+	[FLY, SEAM],
+]);
+
 /** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
-export const V: VMap = {};
+export const V: VMap = {HandOver: {v: HAND_V}};

@@ -5,11 +5,11 @@ import {beatsIn, bt, pulse} from '../timing';
 import {TokTicLogo} from '../ui/TokTicLogo';
 import {Density, useDensities} from './density';
 import {ANTON, INK, MONO, SERIF} from './ink';
-import {clamp01, CropMarks, easeOut, inked, kickNudge, lerp, stamp} from './kit';
+import {clamp01, CropMarks, easeInOut, easeOut, inked, kickNudge, lerp, stamp} from './kit';
 import {Poly} from './masks';
 import {Cam, CAM0, Plate, Sheet, sheetMatrix} from './press';
 import {CamLayer, PaperFill, Press} from './Press';
-import {VMap} from './stage';
+import {bleed, Frame, K_FILL, useStage, VMap, vtrack} from './stage';
 
 // 2:38.2–2:52.8, drop 3 (bars 85–92), instrumental. GRAFT 3, in place of the old phone table.
 // On the downbeat Maya flips her lime phone face-down; the friends stack theirs on top. The top phone of the
@@ -890,11 +890,596 @@ const Triptych: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => 
 
 export const InkBattery: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P30', 'P31', 'P32', 'P33']);
+	const {vertical} = useStage();
 	if (!d) return <PaperFill />;
+	if (vertical) return <VInkBattery t={t} d={d} />;
 	if (t < EMPTY) return <Slam t={t} d={d} />;
 	if (t < TRIP) return <Batteries t={t} d={d} />;
 	return <Triptych t={t} d={d} />;
 };
 
+// ------------------------------------------------------------------ 9:16
+// On the phone the battery stands upright and fills from the bottom, like a phone's charging screen: each cell is a
+// strip of the night, feet first, Maya's face and raised arms arriving at the top. The readout rides the charge front
+// up the empty battery and steps out over the nub once it no longer fits. The three full batteries stack end to end
+// (each standing on the nub of the one below), the bolts climb the stack, the interiors burst open into three bands
+// filling the phone, and the bands collapse into the flat Rule. The frame looks at the middle of the stage at K_FILL
+// throughout; the shots are the battery world's own camera (world px -> frame px = sf).
+
+const VBW = 600;
+const VBH = 1200;
+const VIW = VBW - 2 * PAD; // 536
+const VIH = VBH - 2 * PAD; // 1136
+const NUB_W = 228;
+const NUB_H = 52;
+const NUB_GAP = 12;
+/** Battery centres in the stack: each stands on the nub of the one below. */
+const VPITCH = VBH + NUB_GAP + NUB_H + 4;
+const VY = [1500 - 2 * VPITCH, 1500 - VPITCH, 1500];
+const VX = 960;
+const READ_V = 220;
+
+/**
+ * Portrait crops (image fractions) seen through the upright interior (aspect VIW:VIH): Maya in the middle, feet in the
+ * bottom cells, her face and raised hands in the top third. P31: out of the lit door, Jess's and Dev's arms either
+ * side. P32: in front of the shop door. P33: mid-jump, her arm linked with Sam's.
+ */
+const VBAND: Record<Bat['id'], [number, number, number, number]> = {
+	P31: [0.413, 0.25, 0.607, 0.985],
+	P32: [0.414, 0.27, 0.606, 1],
+	P33: [0.69, 0.2, 0.848, 0.8],
+};
+/**
+ * The triptych bands: the crop's centre (u, v) and height (v) once open (its width comes from the band's aspect), and
+ * where its push lands: on Maya in all three (in P33 her face, u 0.76, with Sam's shoulder beside her).
+ */
+const VTRI: Record<Bat['id'], {u: number; v: number; h: number; push: Pt}> = {
+	P31: {u: 0.51, v: 0.47, h: 0.5, push: [0.513, 0.41]},
+	P32: {u: 0.51, v: 0.5, h: 0.5, push: [0.518, 0.43]},
+	P33: {u: 0.7, v: 0.45, h: 0.5, push: [0.74, 0.38]},
+};
+
+/** A battery-world camera: world (x, y) at the centre of the phone, sf frame px per world px. */
+const vcam = (x: number, y: number, sf: number, rot = 0): Cam => ({cx: x, cy: y, s: sf / K_FILL, rot});
+/** World point -> vertical frame px under a battery-world camera. */
+const vFramePt = (c: Cam, x: number, y: number): Pt => {
+	const [sx, sy] = camPoint(c, x, y);
+	return [540 + (sx - 960) * K_FILL, 960 + (sy - 540) * K_FILL];
+};
+
+type VCell = {y: number; h: number; i: number};
+/** Cells as horizontal strips, battery-local px (centre origin): cell 0 at the bottom. */
+const vcellsOf = (b: Bat): VCell[] => {
+	const n = b.times.length;
+	const ch = (VIH - (n - 1) * b.gap) / n;
+	return Array.from({length: n}, (_, i) => ({y: VIH / 2 - (i + 1) * ch - i * b.gap, h: ch, i}));
+};
+/** Battery-local y of the charge front after m cells. */
+const vfrontY = (b: Bat, m: number) => {
+	const ch = (VIH - (b.times.length - 1) * b.gap) / b.times.length;
+	return m <= 0 ? VIH / 2 : VIH / 2 - m * (ch + b.gap) + b.gap;
+};
+const vfrontAt = (b: Bat, t: number, dur = 0.12) => {
+	const n = countAt(b.times, t);
+	if (n <= 0) return vfrontY(b, 0);
+	return lerp(vfrontY(b, n - 1), vfrontY(b, n), outBack((t - b.times[n - 1]) / dur, 1.3));
+};
+
+/** Where battery i stands: alone in its own shot; in the stack, 2 and 1 drop onto 3 from above (as in 16:9). */
+const VDROP = 1500;
+const vplace = (i: number, t: number): {x: number; y: number; rot: number} => {
+	const b = BATS[i];
+	if (t < ZOOM0) return {x: VX, y: VY[i], rot: 0};
+	const rk = easeOut((t - STK) / 0.2);
+	const k = i < 2 ? clamp01((t - FALL0) / (LAND[i] - FALL0)) : 1;
+	return {x: VX, y: VY[i] - VDROP * (1 - k * k), rot: b.stackRot * rk};
+};
+
+/** The readout's size at rest (bolt on its beat pulse included), battery-local px, by digit count: measured on renders. */
+const vReadW = (b: Bat, t: number) => READ_V * [0, 1.62, 2.15, 2.45][String(pctOf(b, t)).length];
+const V_READ_H = READ_V * 1.02;
+const V_OVER = -VBH / 2 - NUB_GAP - NUB_H - 26; // the readout's foot once it has stepped out over the nub
+/**
+ * How many cells in the readout steps out over the nub: once it no longer fits above the newest strip. On the
+ * quarter-beat battery that would fall on a sixteenth, so it goes from the first cell of that beat instead and the
+ * shot that holds it can be framed on the beat's cut (rather than jumping three frames before the next one).
+ */
+const vOverFrom = (b: Bat) => {
+	let n = 0;
+	while (n < b.times.length && vfrontY(b, n) - 26 + VIH / 2 >= V_READ_H * 1.12 + 18) n++;
+	const perBeat = Math.round(b.times.length / beatTimes(b.times[0], b.times[b.times.length - 1] + 1e-3).length);
+	return perBeat > 2 ? Math.floor((n - 1) / perBeat) * perBeat + 1 : n;
+};
+const V_OVER_FROM = BATS.map(vOverFrom);
+/**
+ * The readout's foot: just above the newest strip while it fits in the empty battery, then over the nub. It steps up
+ * with each stamp (the strip lands at once, so a sliding readout would sit on it for a few frames).
+ */
+const vReadFoot = (b: Bat, t: number) => {
+	const n = countAt(b.times, t);
+	return n < V_OVER_FROM[BATS.indexOf(b)] ? vfrontY(b, n) - 26 : V_OVER;
+};
+const V_BRAND = VBH / 2 + 18; // the top of 'real life', under the battery
+/** The safe band the readout keeps to (frame px; the feed's buttons sit right of 940) and the widest it may print. */
+const V_SAFE_L = 70;
+const V_SAFE_R = 925;
+const V_READ_MAX = (V_SAFE_R - V_SAFE_L) / 1.02; // (the per-beat kick pushes it out by up to 1.8%)
+/** The readout's scale in a shot at sf frame px per world px: 1, or less where even centred it would run past the safe band (a close '100%'). */
+const vReadScale = (b: Bat, t: number, sf: number) => Math.min(1, V_READ_MAX / (vReadW(b, t) * 1.12 * sf));
+/**
+ * Moves a shot only as far as needed for the readout (at the stamp peak) to sit in the phone's title-safe area, and,
+ * in a held shot (`brand`), for 'real life' to be either wholly inside the safe area or wholly out of the frame (never
+ * a sliver at the bottom edge, nor under the feed's caption). A moving shot lets it pass out of frame.
+ */
+const vfit = (c0: Cam, i: number, t: number, brand = true): Cam => {
+	const b = BATS[i];
+	const p = vplace(i, t);
+	const r = (p.rot * Math.PI) / 180;
+	const at = (c: Cam, x: number, y: number) => vFramePt(c, p.x + x * Math.cos(r) - y * Math.sin(r), p.y + x * Math.sin(r) + y * Math.cos(r));
+	const sf = c0.s * K_FILL * Math.cos(((c0.rot ?? 0) * Math.PI) / 180);
+	let c = c0;
+	let rtop = -Infinity;
+	if (countAt(b.times, t) > 0) {
+		const rs = vReadScale(b, t, c0.s * K_FILL);
+		const w = (vReadW(b, t) * 1.12 * rs) / 2;
+		const h = V_READ_H * 1.12 * rs;
+		const foot = vReadFoot(b, t);
+		const pts = [
+			[-w, foot],
+			[w, foot],
+			[-w, foot - h],
+			[w, foot - h],
+		].map(([x, y]) => at(c, x, y));
+		const top = Math.min(...pts.map((q) => q[1]));
+		const left = Math.min(...pts.map((q) => q[0]));
+		const right = Math.max(...pts.map((q) => q[0]));
+		const [L0, R0, T0] = [V_SAFE_L, V_SAFE_R, 250];
+		const dx = right - left > R0 - L0 ? (L0 + R0) / 2 - (left + right) / 2 : left < L0 ? L0 - left : right > R0 ? R0 - right : 0;
+		const dy = top < T0 ? T0 - top : 0;
+		c = {...c, cx: c.cx - dx / sf, cy: c.cy - dy / sf};
+		rtop = top + dy;
+	}
+	// 'real life' (its glyphs from about 20 to 130 px below its top, at the brand's 150 px)
+	const ytop = Math.min(at(c, -VBW / 2, V_BRAND + 20)[1], at(c, 0, V_BRAND + 20)[1]);
+	const ybot = Math.max(at(c, -VBW / 2, V_BRAND + 130)[1], at(c, 0, V_BRAND + 130)[1]);
+	if (brand && ytop < 1935 && ybot > 1620) {
+		const up = ybot - 1620;
+		const down = 1935 - ytop;
+		const dy = up <= down && rtop - up >= 250 ? -up : down;
+		c = {...c, cy: c.cy - dy / sf};
+	}
+	return c;
+};
+
+/** 91.1 to 91.3 up the stack, a battery per bolt (the column left of centre, the 100%s on its right); 91.4 all of it. */
+const V_COL = 390; // frame x of the column in the stack shots
+const V_SK = 0.66;
+const V_STACK: Cam[] = [
+	vcam(VX + (540 - V_COL) / V_SK, VY[2] - 330, V_SK, 3), // the bottom battery low in frame, the middle one landing on its nub
+	vcam(VX + (540 - V_COL) / V_SK, VY[1], V_SK, -3),
+	vcam(VX + (540 - V_COL) / V_SK, VY[0] + 150, V_SK, 2.5),
+	// the whole column a little left of centre: the small bolts on its left, the 100%s on its right, the big bolt over it
+	vcam(VX + (540 - 450) / 0.42, (VY[0] - VBH / 2 - NUB_GAP - NUB_H + VY[2] + VBH / 2) / 2, 0.42, 0),
+];
+
+/**
+ * Battery 2's stepped tilt: the battery-local y the camera centres on, riding the charge front (the newest strip at
+ * frame y 1150 for the first cell, so 'real life' under it is in the safe area, then 1225), easing to the next strip
+ * over the 0.1 s before it lands. At sf 1.5 and 2.5 degrees, 'real life' is then wholly in frame at each hold until it
+ * is wholly out (1225 sits in the 30 px window that allows).
+ */
+const vRide = (t: number) => {
+	const b = BATS[1];
+	const n = countAt(b.times, t);
+	const yAt = (m: number) => vfrontY(b, m) - ((m <= 1 ? 1150 : 1225) - 960) / 1.5;
+	if (n < 1 || n >= b.times.length - 1) return yAt(Math.max(1, Math.min(n, b.times.length - 1)));
+	return lerp(yAt(n), yAt(n + 1), easeInOut(clamp01((t - (b.times[n] - 0.1)) / 0.1)));
+};
+
+/** The upright battery shots' camera, before the per-kick push and the landing shakes. */
+const vBaseCam = (t: number): Cam => {
+	const b1 = BATS[0];
+	const [y1, y2, y3] = VY;
+	if (t < C1[0]) return vcam(VX, y1 + 50, 0.94); // 85.4: the empty battery, 'real life' at 0%
+	if (t < BAR87) {
+		// 86.1: tight on the foot of the battery (its base held near the bottom of frame) as the first strips go in, a
+		// step closer on every beat with the tilt flipping
+		const i = beatOf(bt(86), t);
+		const sf = [1.4, 1.48, 1.56, 1.64][i];
+		return vfit(vcam(VX, y1 + VBH / 2 - 600 / sf, sf, [0, -1.5, 1.5, -1.5][i]), 0, t);
+	}
+	if (t < BAR88) {
+		// 87.1: wide with 'real life', the tilt flipping and the scale stepping on every beat
+		const i = beatOf(BAR87, t);
+		return vfit(vcam(VX, y1 + 50, [0.92, 0.98, 0.92, 0.98][i], [-3, 2.5, -2.5, 3][i]), 0, t);
+	}
+	if (t < C1[11]) {
+		// 88.1: tight on the faces at the charge front, the readout over it
+		const i = beatOf(BAR88, t);
+		return vfit(vcam(VX, y1 + vfrontAt(b1, t, 0.16) + 120, 1.62, [1.5, -1.5, 1.5][i]), 0, t);
+	}
+	if (t < C2[0]) return vfit(vcam(VX, y1 - 30, 0.8, 3), 0, t); // 88.4: out wide on the 100%: CHARGED
+	if (t < C3[0]) {
+		// battery 2: a stepped tilt up from her feet to her face as it charges twice as fast, one step per half-beat:
+		// the camera rides the charge front, easing up to each next strip over the 0.1 s before it lands (so every step
+		// lands on its half-beat) and holding the newest strip near frame y 1225 with the readout above it; out wide on
+		// the last half-beat. (A plain continuous tilt fought the readout's and the brand's framing: it stalled and jumped.)
+		const out = outBack((t - C2[7]) / 0.17, 1.4);
+		return vfit(vcam(VX, y2 + lerp(vRide(t), -30, out), lerp(1.5, 0.8, out), lerp(2.5, 0, out)), 1, t, false);
+	}
+	if (t < ZOOM0) {
+		// battery 3: a step closer on every beat of the bar, the tilt flipping, chasing the front up (from 90.3 the
+		// readout stands over the nub, so 90.3 and 90.4 are framed on the battery's top)
+		const i = beatOf(bt(90), t);
+		return vfit(vcam(VX, y3 + [50, 200, -60, -260][i], [0.94, 1.2, 1.42, 1.6][i], [3, -2, 2, -3][i]), 2, t);
+	}
+	// 91.1: out to the bottom battery as the other two drop onto it; then a hard cut up the stack on each bolt
+	const k = countAt(BOLTS, t) - 1;
+	if (k >= 1) {
+		const c = V_STACK[k];
+		const punch = 1 + (k < 3 ? 0.07 : 0.05) * decay(t, BOLTS[k], 0.1);
+		return {...c, s: c.s * punch, rot: (c.rot ?? 0) * (1 + 0.5 * decay(t, BOLTS[k], 0.08))};
+	}
+	const from = vBaseCam(ZOOM0 - 1e-3);
+	const to = V_STACK[0];
+	const e = outBack((t - ZOOM0) / 0.15, 1.2);
+	const s = Math.exp(lerp(Math.log(from.s), Math.log(to.s), e));
+	return {cx: lerp(from.cx, to.cx, e), cy: lerp(from.cy, to.cy, e), s, rot: lerp(from.rot ?? 0, to.rot ?? 0, e)};
+};
+
+const vCamAt = (t: number): Cam => {
+	const c = vBaseCam(t);
+	const kick = 1 + 0.018 * pulse(t, 0.09);
+	let sh = 0;
+	for (const t0 of [LAND[1], LAND[0]]) if (t >= t0) sh += 14 * decay(t, t0, 0.05);
+	return {...c, cx: c.cx + sh * 0.5, cy: c.cy - sh, s: c.s * kick};
+};
+
+/** One upright battery's lit strips as sheets, the newest stamped in with fresh ink. */
+const vCellSheets = (b: Bat, i: number, d: Record<string, Density>, t: number, cell: number): Sheet[] => {
+	const n = countAt(b.times, t);
+	const p = vplace(i, t);
+	const r = (p.rot * Math.PI) / 180;
+	const [u0, v0, u1, v1] = VBAND[b.id];
+	const out: Sheet[] = [];
+	const tau = b.times.length > 12 ? 0.045 : b.times.length > 8 ? 0.06 : 0.05;
+	for (const c of vcellsOf(b)) {
+		if (c.i >= n) break;
+		const at = b.times[c.i];
+		const fresh = c.i === n - 1 ? decay(t, at, tau) : 0;
+		const ly = c.y + c.h / 2;
+		const fv0 = (c.y + VIH / 2) / VIH;
+		const fv1 = (c.y + c.h + VIH / 2) / VIH;
+		out.push({
+			map: d[b.id],
+			crop: [u0, v0 + fv0 * (v1 - v0), u1, v0 + fv1 * (v1 - v0)],
+			w: VIW,
+			h: c.h,
+			cx: p.x - ly * Math.sin(r),
+			cy: p.y + ly * Math.cos(r),
+			rot: p.rot,
+			s: c.i === n - 1 ? stamp(t, at).s : 1,
+			plates: warm(t, cell, 31 + i * 7 + c.i, fresh),
+			seed: 40 + i * 20 + c.i,
+		});
+	}
+	return out;
+};
+
+/** Battery-local px -> the upright casing's div (its top-left is (-VBW/2, -VBH/2)). */
+const LV = (x: number, y: number) => ({x: x + VBW / 2, y: y + VBH / 2});
+
+/** The upright casing: nub on top, the empty strips' hairlines; children are drawn on the battery. */
+const VCasing: React.FC<{b: Bat; i: number; t: number; knock?: number; children?: React.ReactNode}> = ({b, i, t, knock = 1, children}) => {
+	const p = vplace(i, t);
+	const n = countAt(b.times, t);
+	const border = lerp(VBW / 2, STROKE, knock);
+	return (
+		<div style={{position: 'absolute', left: p.x - VBW / 2, top: p.y - VBH / 2, width: VBW, height: VBH, transform: `rotate(${p.rot}deg)`, transformOrigin: '50% 50%'}}>
+			{knock >= 1 &&
+				vcellsOf(b)
+					.filter((c) => c.i >= n)
+					.map((c) => {
+						const half = c.i !== n || b.times.length !== 12 || n >= 12 ? Infinity : n === 0 ? (EMPTY + b.times[0]) / 2 : (b.times[n - 1] + b.times[n]) / 2;
+						const glow = t >= half ? decay(t, half, 0.12) : 0;
+						const line = glow > 0.02 ? `${2 + 3 * glow}px solid rgba(255,95,31,${(0.35 + 0.65 * glow).toFixed(3)})` : '2px solid rgba(27,26,23,0.3)';
+						return <div key={c.i} style={{position: 'absolute', left: PAD, top: c.y + VBH / 2, width: VIW, height: c.h, border: line, borderRadius: 6, boxSizing: 'border-box'}} />;
+					})}
+			<div style={{position: 'absolute', inset: 0, border: `${border}px solid ${INK.key}`, borderRadius: RAD, boxSizing: 'border-box', mixBlendMode: 'multiply', ...inked(1100, 7 * i, 3 * i, true)}} />
+			<div
+				style={{
+					position: 'absolute',
+					left: (VBW - NUB_W) / 2,
+					top: -NUB_GAP - NUB_H,
+					width: NUB_W,
+					height: NUB_H,
+					borderRadius: '22px 22px 0 0',
+					background: INK.key,
+					mixBlendMode: 'multiply',
+					opacity: knock >= 1 ? 1 : 0,
+					...inked(600, 5, 9, true),
+				}}
+			/>
+			{children}
+		</div>
+	);
+};
+
+/** The writing on an upright battery in its own shot: the readout riding the front, 'real life' and the slug under it. */
+const VDress: React.FC<{b: Bat; t: number; from: number}> = ({b, t, from}) => {
+	const n = countAt(b.times, t);
+	const pct = pctOf(b, t);
+	const last = n > 0 ? b.times[n - 1] : from;
+	const st = stamp(t, last);
+	const brand = stamp(t, from);
+	const bolt = 1 + 0.14 * pulse(t, 0.08);
+	// (scaled down only where even centred it would run past the safe band: the same scale vfit framed it with)
+	const rs = n > 0 ? vReadScale(b, t, vBaseCam(t).s * K_FILL) : 1;
+	return (
+		<>
+			{n > 0 && (
+				<Anchor {...LV(0, vReadFoot(b, t))} ax={0.5} ay={1} s={st.s * rs}>
+					<div style={{display: 'flex', alignItems: 'flex-end', gap: READ_V * 0.06}}>
+						<div style={{transform: `scale(${bolt})`, transformOrigin: '50% 100%', marginBottom: READ_V * 0.02}}>
+							<Bolt h={READ_V * 0.84} seed={n} />
+						</div>
+						<Pct v={pct} size={READ_V} seed={n} />
+					</div>
+				</Anchor>
+			)}
+			<Anchor {...LV(-VBW / 2 + 4, V_BRAND)} ax={0} ay={0} s={brand.s}>
+				<div style={{fontFamily: SERIF, fontStyle: 'italic', fontSize: 150, lineHeight: 0.95, color: INK.key, mixBlendMode: 'multiply', ...inked(900, 3, 11)}}>real life</div>
+			</Anchor>
+			<Anchor {...LV(VBW / 2 + 40, VBH / 2 + 190)} ax={1} ay={0}>
+				<div style={{fontFamily: MONO, fontSize: 25, lineHeight: 1.6, letterSpacing: '0.14em', color: INK.key, mixBlendMode: 'multiply', textAlign: 'right'}}>
+					{b.slug}
+					<br />
+					{`CELL ${String(n).padStart(2, '0')}/${b.times.length} · ${n >= b.times.length ? 'CHARGED' : 'CHARGING'}`}
+				</div>
+			</Anchor>
+			<div style={{position: 'absolute', left: 0, top: 0}}>
+				<CropMarks x={-6} y={-6 - NUB_GAP - NUB_H} w={VBW + 12} h={VBH + 12 + NUB_GAP + NUB_H} len={30} gap={16} color="rgba(27,26,23,0.7)" />
+			</div>
+		</>
+	);
+};
+
+/** In the stack: a bolt stamps on each beat, climbing the column; its 100% on the right. */
+const VStackDress: React.FC<{i: number; t: number}> = ({i, t}) => {
+	const at = BOLTS[2 - i];
+	if (t < at) return null;
+	const st = stamp(t, at);
+	return (
+		<>
+			<Anchor {...LV(-VBW / 2 - 26, 0)} ax={1} ay={0.5} s={st.s * (1 + 0.1 * pulse(t, 0.08))}>
+				<Bolt h={290} seed={i + 2} />
+			</Anchor>
+			<Anchor {...LV(VBW / 2 + 36, 10)} ax={0} ay={0.5} s={st.s}>
+				<Pct v={100} size={210} seed={i + 5} />
+			</Anchor>
+		</>
+	);
+};
+
+/** 85.3: the top phone of the stack slams to the centre and stands up as the battery's slab. */
+const VSlam: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
+	const g = g30(SLAM);
+	const [lx, ly] = toScreen(g, ...Q30.left);
+	const [tx, ty] = toScreen(g, ...Q30.top);
+	const [rx, ry] = toScreen(g, ...Q30.right);
+	const [bx, by] = toScreen(g, ...Q30.bottom);
+	const c0: Pt = [(lx + tx + rx + bx) / 4, (ly + ty + ry + by) / 4];
+	const long0 = Math.hypot(rx - tx, ry - ty);
+	const short0 = Math.hypot(tx - lx, ty - ly);
+	const ang0 = (Math.atan2(ry - ty, rx - tx) * 180) / Math.PI;
+	const cam = vBaseCam(EMPTY);
+	const c1 = camPoint(cam, VX, VY[0]);
+	const e = outBack((t - SLAM) / 0.24, 1.3);
+	const cx = lerp(c0[0], c1[0], e);
+	const cy = lerp(c0[1], c1[1], e);
+	const w = lerp(long0, VBH * cam.s, e);
+	const h = lerp(short0, VBW * cam.s, e);
+	const rot = lerp(ang0, 90, e);
+	const land = SLAM + 0.24;
+	const sh = t >= land ? 7 * decay(t, land, 0.05) : 0;
+	return (
+		<AbsoluteFill>
+			<PaperFill />
+			<StackPage t={t} d={d} />
+			<div
+				style={{
+					position: 'absolute',
+					left: cx - w / 2 + sh * 0.5,
+					top: cy - h / 2 - sh,
+					width: w,
+					height: h,
+					transform: `rotate(${rot}deg)`,
+					borderRadius: lerp(short0 * 0.16, RAD * cam.s, e),
+					background: INK.key,
+					boxShadow: `0 ${lerp(30, 4, e)}px ${lerp(60, 8, e)}px rgba(40,25,10,${lerp(0.35, 0.18, e)})`,
+					...inked(1100, 0, 0, true),
+				}}
+			>
+				<div style={{position: 'absolute', left: h * 0.08, top: h * 0.08, width: h * 0.34, height: h * 0.34, borderRadius: h * 0.08, border: `${Math.max(2, h * 0.012)}px solid rgba(239,231,214,0.5)`}} />
+			</div>
+		</AbsoluteFill>
+	);
+};
+
+/** 91.4: one bolt overprinted down the whole column. */
+const VBigBolt: React.FC<{t: number; at: Pt}> = ({t, at}) => {
+	const st = stamp(t, BOLTS[3]);
+	return (
+		<Anchor x={at[0]} y={at[1]} ax={0.5} ay={0.5} s={st.s} rot={-9} overprint>
+			<Bolt h={900} seed={9} />
+		</Anchor>
+	);
+};
+
+/** 85.4 to 92.1 on the phone: the upright batteries. */
+const VBatteries: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
+	const cam = vCamAt(t);
+	const shown = t < C2[0] ? [0] : t < C3[0] ? [1] : t < ZOOM0 ? [2] : [0, 1, 2];
+	const cell = t >= BOLTS[3] ? 12 : 6.5;
+	const sheets = shown.flatMap((i) => vCellSheets(BATS[i], i, d, t, cell));
+	const knock = easeOut((t - EMPTY) / 0.1);
+	const stacked = t >= ZOOM0;
+	return (
+		<AbsoluteFill>
+			<PaperFill />
+			<Press sheets={sheets} cam={cam} />
+			<CamLayer cam={cam}>
+				{shown.map((i) => {
+					const b = BATS[i];
+					const from = i === 0 ? EMPTY : b.times[0];
+					return (
+						<VCasing key={i} b={b} i={i} t={t} knock={i === 0 ? knock : 1}>
+							{i === 0 && t < C1[0] && (
+								<Anchor {...LV(0, 10)} ax={0.5} ay={0.5} s={stamp(t, EMPTY).s}>
+									<Pct v={0} size={400} color={INK.key} />
+								</Anchor>
+							)}
+							{!stacked && <VDress b={b} t={t} from={from} />}
+							{stacked && <VStackDress i={i} t={t} />}
+						</VCasing>
+					);
+				})}
+			</CamLayer>
+			{t >= BOLTS[3] && <VBigBolt t={t} at={camPoint(cam, VX, VY[1])} />}
+		</AbsoluteFill>
+	);
+};
+
+/** The bands on the phone: three full-width bands stacked down the frame (the stage's K_FILL window, bleeding past it). */
+const vBandEnd = (i: number): Rect => {
+	const h = (1080 - 2 * GUT) / 3;
+	return {x: 960 - 312, y: i * (h + GUT), w: 624, h};
+};
+/** A band's crop: from the upright interior's portrait crop (e 0) to the open band's (e 1); z pushes in on Maya. */
+const vBandCrop = (b: Bat, aspect: number, e: number, z: number): [number, number, number, number] => {
+	const [u0, v0, u1, v1] = VBAND[b.id];
+	const tb = VTRI[b.id];
+	const ee = clamp01(e);
+	const k = (z - 1) / 0.75;
+	let ch = lerp(v1 - v0, tb.h, ee) / z;
+	const uc0 = lerp(lerp((u0 + u1) / 2, tb.u, ee), tb.push[0], k);
+	const vc0 = lerp(lerp((v0 + v1) / 2, tb.v, ee), tb.push[1], k);
+	let cw = (ch * 1536 * aspect) / 2752;
+	if (cw > 1) {
+		ch /= cw;
+		cw = 1;
+	}
+	if (ch > 1) {
+		cw /= ch;
+		ch = 1;
+	}
+	const uc = Math.max(cw / 2, Math.min(1 - cw / 2, uc0));
+	const vc = Math.max(ch / 2, Math.min(1 - ch / 2, vc0));
+	return [uc - cw / 2, vc - ch / 2, uc + cw / 2, vc + ch / 2];
+};
+
+/** The bands' screen on the phone (stage px; the frame shows them at 1.78x). */
+const V_TRI_CELL = 6;
+
+const VTriptych: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
+	const cam = vCamAt(TRIP - 1e-3);
+	const kick = 1 + 0.018 * pulse(t, 0.09);
+	const x = (t - TRIP) / 0.14;
+	const e = outBack(x, 1.1);
+	const shut = easeOut(x);
+	const q = easeOut((t - COLLAPSE) / 0.15);
+	const sheets: Sheet[] = [];
+	const casings: {r: Rect; rot: number}[] = [];
+	BATS.forEach((b, i) => {
+		const p = vplace(i, TRIP - 1e-3);
+		const [sx, sy] = camPoint(cam, p.x, p.y);
+		const r0: Rect = {x: sx - (VIW / 2) * cam.s, y: sy - (VIH / 2) * cam.s, w: VIW * cam.s, h: VIH * cam.s};
+		const r1 = vBandEnd(i);
+		let r: Rect = {x: lerp(r0.x, r1.x, e), y: lerp(r0.y, r1.y, e), w: lerp(r0.w, r1.w, e), h: lerp(r0.h, r1.h, e)};
+		if (q > 0) {
+			const ycen = lerp(r.y + r.h / 2, 540, q);
+			const hh = r.h * (1 - q);
+			r = {...r, y: ycen - hh / 2, h: hh};
+		}
+		if (r.h < 8) return;
+		const zk = easeOut((t - PUSHES[i]) / 0.11);
+		const z = 1 + 0.75 * zk;
+		const fresh = Math.max(decay(t, TRIP, 0.09), t >= PUSHES[i] ? decay(t, PUSHES[i], 0.07) : 0);
+		const [cu0, cv0, cu1, cv1] = vBandCrop(b, r.w / Math.max(1, r.h), e, z);
+		const rot = lerp(p.rot, 0, e) + (cam.rot ?? 0) * (1 - e);
+		const cxr = r.x + r.w / 2;
+		const cyr = r.y + r.h / 2;
+		if (shut < 0.995) {
+			casings.push({r, rot});
+			const n = b.times.length;
+			const gap = b.gap * cam.s * (1 - shut);
+			const ch = (r.h - (n - 1) * gap) / n;
+			const rr = (rot * Math.PI) / 180;
+			for (let c = 0; c < n; c++) {
+				const y0 = r.y + r.h - (c + 1) * ch - c * gap;
+				const fv0 = (y0 - r.y) / r.h;
+				const fv1 = (y0 + ch - r.y) / r.h;
+				const ly = y0 + ch / 2 - cyr;
+				sheets.push({
+					map: d[b.id],
+					crop: [cu0, cv0 + fv0 * (cv1 - cv0), cu1, cv0 + fv1 * (cv1 - cv0)],
+					w: r.w,
+					h: ch,
+					cx: cxr - ly * Math.sin(rr),
+					cy: cyr + ly * Math.cos(rr),
+					rot,
+					plates: warm(t, V_TRI_CELL, 60 + i, fresh),
+					seed: 70 + i * 20 + c,
+				});
+			}
+		} else {
+			sheets.push({map: d[b.id], crop: [cu0, cv0, cu1, cv1], w: r.w, h: r.h, cx: cxr, cy: cyr, s: kick * (t >= PUSHES[i] ? stamp(t, PUSHES[i]).s : 1), plates: warm(t, V_TRI_CELL, 60 + i, fresh), seed: 90 + i});
+		}
+	});
+	const thin = clamp01((t - COLLAPSE - 0.11) / 0.1);
+	const pad = PAD * cam.s * (1 - shut);
+	const stroke = STROKE * cam.s * (1 - shut);
+	return (
+		<AbsoluteFill>
+			<PaperFill />
+			<Press sheets={sheets} />
+			{casings.map(({r, rot}, i) => (
+				<div
+					key={i}
+					style={{
+						position: 'absolute',
+						left: r.x - pad,
+						top: r.y - pad,
+						width: r.w + 2 * pad,
+						height: r.h + 2 * pad,
+						transform: `rotate(${rot}deg)`,
+						border: `${stroke}px solid ${INK.key}`,
+						borderRadius: RAD * cam.s * (1 - shut),
+						boxSizing: 'border-box',
+						mixBlendMode: 'multiply',
+						...inked(1100, 7 * i, 3 * i, true),
+					}}
+				/>
+			))}
+			{q > 0.6 && <div style={{position: 'absolute', left: 0, top: 540 - lerp(14, 3.5, thin), width: 1920, height: lerp(28, 7, thin), background: INK.key, mixBlendMode: 'multiply', ...inked(1024, 0, 0, true)}} />}
+		</AbsoluteFill>
+	);
+};
+const VInkBattery: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
+	if (t < EMPTY) return <VSlam t={t} d={d} />;
+	if (t < TRIP) return <VBatteries t={t} d={d} />;
+	return <VTriptych t={t} d={d} />;
+};
+
+/** The frame over the stage: the middle of it at K_FILL (the battery world's camera does the shooting). */
+const SEAM: Frame = {k: K_FILL, x: 960, y: 540};
+
+/** The flip: her phone and hand fill the phone; a push onto the black back as it lands; the stack, centred. */
+const FLIPSTACK_V = vtrack([
+	[FLIP, bleed(950)],
+	[FLIP_AT + FLIP_DUR, bleed(965, 500, 2.0), 0.12],
+	[STACK, SEAM],
+]);
+
 /** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
-export const V: VMap = {};
+export const V: VMap = {FlipStack: {v: FLIPSTACK_V}, InkBattery: {v: () => SEAM}};

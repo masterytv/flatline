@@ -6,6 +6,7 @@ import {hash2, INK, SERIF} from './ink';
 import {clamp01, easeOut, inked, lerp} from './kit';
 import {Sheet} from './press';
 import {Press} from './Press';
+import {K_FILL, useStage} from './stage';
 
 // The 3:17 keepsake (P49, the group photo on the floor, Maya nearest the lens). It slides in from the bottom on
 // 108.1 as DANCING jumps to the top band (never crossing the word), is circled in grease pencil on 108.2-108.3,
@@ -41,10 +42,27 @@ const KFOOT = 66; // the caption strip
 /** The whole print, paper included. */
 export const KEEP_BOX = {w: KEEP.w + 2 * KB, h: KEEP.h + KB + KFOOT};
 
-export const keepPose = (t: number) => {
+/**
+ * 9:16 (stage px as the SEAM camera sees them, K_FILL on 960, 540): the same print at 0.61, 976 x 619 frame px, its image
+ * centred on frame (540, 1000) under DANCING's top band (cap y 241-645 on the phone), the camera roll peeking out under
+ * it. It still slides in from below and leaves left at dawn, over 1525 stage px (2.5 phone widths) in the same 0.42 s.
+ * Dawn (s_outro.tsx) renders it too, so Dawn's vertical camera should be SEAM until F.dawn + EXIT.
+ */
+export const KEEP_V = {cx: 960, cy: 540 + (1000 - 960) / K_FILL, s: 0.61, rot: -1.6};
+
+export const keepPose = (t: number, vertical = false) => {
 	const k = easeOut((t - LAND + LEAD) / SLIDE); // already sliding in on the beat's own frame
 	const x = clamp01((t - F.dawn) / EXIT);
 	const off = x * x;
+	if (vertical) {
+		return {
+			cx: KEEP_V.cx - 40 * (1 - k) - 1525 * off,
+			cy: KEEP_V.cy + 700 * (1 - k) + 40 * off,
+			rot: lerp(6, KEEP_V.rot, k) - 10 * off,
+			s: KEEP_V.s * lerp(1.05, 1, k),
+			air: Math.max(1 - k, 0.6 * off),
+		};
+	}
 	return {
 		cx: KEEP.cx - 70 * (1 - k) - 2500 * off,
 		cy: KEEP.cy + 700 * (1 - k) + 60 * off,
@@ -80,9 +98,10 @@ const ringPath = (ring: MayaRing, w: number, h: number) => {
 /** The keepsake: a white-bordered print (still two inks, never a photograph), Maya circled in grease pencil. */
 export const KeepsakePrint: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P49']);
+	const {vertical} = useStage();
 	if (t < LAND) return null;
-	const q = keepPose(t);
-	if (q.cx < -1600) return null;
+	const q = keepPose(t, vertical);
+	if (q.cx < -1600 || (vertical && t >= F.dawn + EXIT)) return null;
 	const r = (q.rot * Math.PI) / 180;
 	const off = ((KFOOT - KB) / 2) * q.s;
 	const pcx = q.cx - Math.sin(r) * off;

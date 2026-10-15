@@ -1,15 +1,15 @@
 import React from 'react';
-import {AbsoluteFill} from 'remotion';
+import {AbsoluteFill, Img} from 'remotion';
 import {F} from '../full/cues';
 import {bt} from '../timing';
 import {TokTicLogo} from '../ui/TokTicLogo';
-import {useDensities} from './density';
+import {PAPER_URL, useDensities} from './density';
 import {ANTON, INK, MONO, SERIF} from './ink';
 import {clamp01, easeIn, easeInOut, easeOut, ecg, inked, lerp} from './kit';
 import {Cam, Plate, Sheet, sheetMatrix} from './press';
 import {KeepsakePrint} from './s_keepsake';
 import {CamLayer, OnSheet, Paper, PaperFill, Press} from './Press';
-import {VMap} from './stage';
+import {bleed, Frame, K_FILL, useStage, VMap, vtrack} from './stage';
 
 // 3:21.9 to the end card: sunrise as a split fountain (the night's ultramarine pushed off the top of the sheet by
 // the warm ink), the morning-after postcards and TokTic's last stub (0 MIN · BATTERY 100%), the living line drawn
@@ -290,6 +290,7 @@ const ZERO_LOOP = loop(106, 378, 122, 166);
 const RING = 0.12; // the loop closes on the third frame after zero and holds closed until the cut (209.0)
 
 const Stub: React.FC<{t: number}> = ({t}) => {
+	const {vertical} = useStage();
 	if (t < STUB_IN - FR) return null;
 	const k = easeOut((t - (STUB_IN - FR)) / 0.17);
 	const zero = t >= ZERO ? 1 - easeOut((t - ZERO) / 0.22) : 0;
@@ -297,8 +298,8 @@ const Stub: React.FC<{t: number}> = ({t}) => {
 	let j = 0;
 	while (j + 1 < COUNT.length && COUNT[j + 1][0] <= t) j++;
 	const knock = Math.exp(-(t - COUNT[j][0]) / 0.07) * (j === COUNT.length - 1 ? 0 : 1);
-	const x = STUB.cx + 820 * (1 - k);
-	const rot = STUB.rot + 9 * (1 - k) + 0.6 * knock;
+	const x = vertical ? STUB_V.cx : STUB.cx + 820 * (1 - k);
+	const rot = vertical ? STUB_V.rot - 7 * (1 - k) + 0.6 * knock : STUB.rot + 9 * (1 - k) + 0.6 * knock;
 	const s = STUB.scale * (1 + 0.045 * zero);
 	const lift = 1 - clamp01((t - STUB_IN) / 0.25);
 	const pad = 34;
@@ -308,7 +309,7 @@ const Stub: React.FC<{t: number}> = ({t}) => {
 			style={{
 				position: 'absolute',
 				left: x - STUB.w / 2,
-				top: STUB.cy - STUB.h / 2 - 5 * knock,
+				top: (vertical ? STUB_V.cy + STUB_V.rise * (1 - k) : STUB.cy) - STUB.h / 2 - 5 * knock,
 				width: STUB.w,
 				height: STUB.h,
 				transform: `rotate(${rot}deg) scale(${s})`,
@@ -363,11 +364,12 @@ const Stub: React.FC<{t: number}> = ({t}) => {
 };
 
 export const Postcard: React.FC<{t: number}> = ({t}) => {
+	const {vertical} = useStage();
 	const d = useDensities(CARDS.map((c) => photo(c.id).map));
 	return (
 		<AbsoluteFill>
-			<PaperFill />
-			{CARDS.map((c) => (
+			{vertical ? <Table at={POST_TABLE} /> : <PaperFill />}
+			{(vertical ? CARDS_V : CARDS).map((c) => (
 				<PostcardPrint key={c.id} t={t} c={c} map={d ? d[photo(c.id).map] : null} />
 			))}
 			<Stub t={t} />
@@ -435,13 +437,17 @@ const Words: React.FC<{t: number; opacity?: number}> = ({t, opacity = 1}) => {
 	);
 };
 
-export const LivingLine: React.FC<{t: number}> = ({t}) => (
-	<AbsoluteFill>
-		<PaperFill />
-		<Words t={t} />
-		<LivingStroke t={t} />
-	</AbsoluteFill>
-);
+export const LivingLine: React.FC<{t: number}> = ({t}) => {
+	const {vertical} = useStage();
+	// 9:16: the words are set for the phone in its own frame (LineWordsV) and the paper moves with the camera
+	return (
+		<AbsoluteFill>
+			{vertical ? <Table at={LINE_TABLE} /> : <PaperFill />}
+			{!vertical && <Words t={t} />}
+			<LivingStroke t={t} width={vertical ? 6.5 : 8} />
+		</AbsoluteFill>
+	);
+};
 
 /* ------------------------------------------------------------------------------------------------------------- */
 /* End card: the living line folds down into a small mark and the line is pressed into the paper.                 */
@@ -466,22 +472,36 @@ const deboss = (k: number, px: number, light: number, ink: number | null): React
 	};
 };
 
-export const EndCard: React.FC<{t: number}> = ({t}) => {
-	const fold = easeInOut((t - F.songEnd) / 0.5);
-	const s = lerp(1, MARK.s, fold);
-	// the line's bounding box centre (drawn: x PEN_X0..xEnd, baseline PEN.y, blips up to PEN.amp)
-	const cx = (PEN_X0 + PEN.xEnd) / 2;
-	const cy = PEN.y - PEN.amp * 0.45;
-	const tx = lerp(cx, MARK.x, fold);
-	const ty = lerp(cy, MARK.y, fold);
+/** The end card's clock: the fade out, the light's drift, and each line's press (depth, ink, scale). */
+const endState = (t: number) => {
 	const out = 1 - easeIn((t - (F.endCardOut - 0.7)) / 0.7);
 	const light = clamp01((t - F.songEnd) / (F.endCardOut - F.songEnd));
 	const press = (at: number) => {
 		const k = clamp01((t - at) / 0.2);
 		return {depth: easeOut(k) * out, ink: clamp01((t - at) / (2 * FR)) * out, s: 1.012 - 0.012 * easeOut(k)};
 	};
-	const tag = press(TAG_IN);
-	const brand = press(BRAND_IN);
+	return {out, light, tag: press(TAG_IN), brand: press(BRAND_IN)};
+};
+
+export const EndCard: React.FC<{t: number}> = ({t}) => {
+	const {vertical} = useStage();
+	const fold = easeInOut((t - F.songEnd) / 0.5);
+	// 9:16: the mark sits under the tagline in the phone's own layout (EndCardV), and the paper moves with the camera
+	const mk = vertical ? MARK_V : MARK;
+	const s = lerp(1, mk.s, fold);
+	// the line's bounding box centre (drawn: x PEN_X0..xEnd, baseline PEN.y, blips up to PEN.amp)
+	const cx = (PEN_X0 + PEN.xEnd) / 2;
+	const cy = PEN.y - PEN.amp * 0.45;
+	const tx = lerp(cx, mk.x, fold);
+	const ty = lerp(cy, mk.y, fold);
+	const {out, light, tag, brand} = endState(t);
+	if (vertical)
+		return (
+			<AbsoluteFill>
+				<Table at={LINE_TABLE} />
+				<LivingStroke t={t} tip={false} width={lerp(6.5, MARK_V.w, fold)} opacity={out} transform={`translate(${tx} ${ty}) scale(${s}) translate(${-cx} ${-cy})`} />
+			</AbsoluteFill>
+		);
 	return (
 		<AbsoluteFill>
 			<PaperFill />
@@ -497,5 +517,184 @@ export const EndCard: React.FC<{t: number}> = ({t}) => {
 	);
 };
 
+/* ------------------------------------------------------------------------------------------------------------- */
+/* 9:16. Every change to what the stage draws above is gated on `vertical`; the 16:9 cut is untouched.            */
+
+/** A camera that puts stage point (x, y) at frame point (fx, fy), zoom k; the paper runs past the stage (Table). */
+const at = (k: number, x: number, y: number, fx = 540, fy = 960): Frame => ({k, x: x - (fx - 540) / k, y: y - (fy - 960) / k, clip: false});
+/**
+ * The newsprint as a table under the camera, in world space so it moves with the camera and runs well past the stage.
+ * It is ONE copy of the paper scan, turned upright and scaled by s, centred on (cx, cy): the scan's edges don't match,
+ * so a repeated texture left faint straight seams and a repeated mottle (visible on the end card's hold). Each section's
+ * copy is sized to cover every view its camera takes; the plain paper ground beyond it is never seen.
+ */
+type TableAt = {cx: number; cy: number; s: number};
+const SCAN = {w: 2048, h: 1152};
+const Table: React.FC<{at: TableAt}> = ({at: c}) => (
+	<div style={{position: 'absolute', left: -700, top: -1800, width: 3320, height: 4800, background: INK.paper, overflow: 'hidden'}}>
+		<Img
+			src={PAPER_URL}
+			style={{position: 'absolute', left: c.cx + 700 - (SCAN.w * c.s) / 2, top: c.cy + 1800 - (SCAN.h * c.s) / 2, width: SCAN.w * c.s, height: SCAN.h * c.s, transform: 'rotate(90deg)', mixBlendMode: 'multiply'}}
+		/>
+	</div>
+);
+// Postcards: every view lies in x 377-1513, y -241-1815 (P53's first frame to the pull back); 1.03 covers it at about
+// the stage paper's own grain.
+const POST_TABLE: TableAt = {cx: 945, cy: 787, s: 1.03};
+// The living line and the end card: the tracking camera, the release and the end card see x 117-2017, y -1356-1844.
+// At 1.67 the grain on the end card (k 0.6) is the 16:9 paper's.
+const LINE_TABLE: TableAt = {cx: 1067, cy: 244, s: 1.67};
+
+// The boundary with the camera roll: the keepsake is the same print on both sides, so both cameras meet here.
+const SEAM: Frame = {k: K_FILL, x: 960, y: 540};
+
+// Dawn. The sheet is 2000 x 1116 on the stage (u 0 at x -40, v 0 at y -18). Each photo's cut stays a cut; the key
+// plate's off-beat pull gets a camera move of its own, so the phone changes on every beat while the fountain rises.
+const DAWN_V = vtrack([
+	// 201.921 P50 at the seam (Jess, Kai and Dev on the bench) while the keepsake slides off to the left...
+	[F.dawn, SEAM],
+	// ...202.420 the camera follows it left and lands on Maya's head on Jess's shoulder (u 0.22-0.49), sky above them
+	[bt(109, 2), bleed(668, 560, 2), 0.24],
+	// 202.931 P51: Maya at the parapet in profile, her face left of centre with the sky ahead of her (u 0.44-0.75)
+	[bt(109, 3), bleed(1150)],
+	// 203.442 push to her profile as the key plate snaps in: eye at frame y 700, the blend across her face
+	[bt(109, 4), bleed(1135, 436, 2.2), 0.2],
+	// 203.964 P52: Jess and Sam walking home, shoes in hand, head to bare feet (u 0.2-0.5)
+	[bt(110), bleed(680)],
+	// 204.428 whip to Kai and Dev ahead of them (u 0.55-0.82)
+	[bt(110, 2), bleed(1340, 560, 2), 0.22],
+	// 204.881-205.334 the camera rides the rising split line back out to the street: Kai and Dev whole on the right,
+	// the road running into the sunrise gap on the left third (u 0.43-0.73, nobody cut by the frame's edges)
+	[bt(110, 4), bleed(1215), 0.45],
+]);
+
+// Postcards. On the phone the table is laid out for the frame: the cards at the top, the stub rising up under them
+// from the foot of the frame (a phone's own direction), so the last pull back holds the sleepers over '0 MIN'.
+const CARDS_V: Card[] = [
+	{...CARDS[0], cx: 905, cy: 372, rot: -4, first: [960, 470, -2.5], from: [-1100, 110, -16]},
+	// dealt from 860 px left: about half of it is in on its beat frame under the close camera, and none of it shows in
+	// the stub's close-up on the frame before
+	{...CARDS[1], cx: 968, cy: 330, rot: 3, from: [-860, -80, 11]},
+];
+/** Stage point of a spot on a landed card, in image px from the picture's top-left (its rotation applied). */
+const onCard = (c: Card, lx: number, ly: number): [number, number] => {
+	const r = (c.rot * Math.PI) / 180;
+	const dx = lx - IMG.w / 2;
+	const dy = ly - IMG.h / 2;
+	return [c.cx + dx * Math.cos(r) - dy * Math.sin(r), c.cy + dx * Math.sin(r) + dy * Math.cos(r)];
+};
+// P54 (crop 0.06-0.79 x 0.11-0.84): Maya's face, asleep in the middle of the heap (u 0.52, v 0.45 on the still)
+const MAYA54 = onCard(CARDS_V[1], ((0.52 - 0.06) / 0.73) * IMG.w, ((0.45 - 0.11) / 0.73) * IMG.h);
+// the stub sits under the right half of the cards, so its lime header is whole at the foot of the P54 close-up
+const STUB_V = {...STUB, cx: 1090, cy: 1075, rise: 980};
+/** Stage point of a spot on the stub, given in stub px from its top-left (its rotation and scale applied). */
+const onStub = (lx: number, ly: number): [number, number] => {
+	const r = (STUB_V.rot * Math.PI) / 180;
+	const dx = (lx - STUB_V.w / 2) * STUB_V.scale;
+	const dy = (ly - STUB_V.h / 2) * STUB_V.scale;
+	return [STUB_V.cx + dx * Math.cos(r) - dy * Math.sin(r), STUB_V.cy + dx * Math.sin(r) + dy * Math.cos(r)];
+};
+const COUNT_AT = onStub(220, 336); // the middle of the minutes
+const ZERO_AT = onStub(220, 425); // the '0', MIN and the battery
+// the whole pile, both cards and the stub, with the cards' left edge clear of the frame's (x 60)
+const PILE: Frame = at(0.95, 945, 804);
+const POST_V = vtrack([
+	// 205.787 P53 dealt alone, close on the stack of phones: the card bleeds off the right, its caption reads on the left
+	[F.screenTime, at(1.22, 960 - 470 + 24, 497, 70, 900)],
+	// 206.240 the stub rises in from the foot of the frame: TokTic's own lime header, 214 MIN
+	[STUB_IN, at(1.55, STUB_V.cx, STUB_V.cy, 520, 930)],
+	// 206.692 and 207.145: the count steps down and the camera pushes in on it, twice
+	[bt(111, 3), at(1.75, COUNT_AT[0], COUNT_AT[1], 520, 880), 0.14],
+	[bt(111, 4), at(1.95, COUNT_AT[0], COUNT_AT[1], 520, 860), 0.14],
+	// 207.714 P54 slapped down on top, close on the sleepers: Maya's face just left of centre, Jess above her, Dev below,
+	// Kai on the right (Sam is the pull back's reveal); the stub's lime header peeks in at the foot
+	[bt(112), at(2, MAYA54[0], MAYA54[1], 515, 880)],
+	// 208.283 pull back: all five, the pile and the stub together, the count at 10
+	[bt(112, 2), PILE, 0.22],
+	// 208.794 slam in on '0 MIN · BATTERY 100%' as the zero stamps
+	[ZERO, at(1.72, ZERO_AT[0], ZERO_AT[1], 520, 900), 0.12],
+]);
+
+// The living line. The words are set for the phone in its own frame (they stay put); the camera tracks the pen at
+// 1.5x, so each heartbeat is drawn in the middle of the frame on its beat, then pulls back to the whole line.
+const TRACK_K = 1.5;
+const LINE_FY = 1330; // the baseline's frame y while the camera tracks the pen
+const END_FY = 1236; // and once it has pulled back to the whole line, closer under the words
+const PEN_FX0 = 150; // where the line starts in the frame
+const PEN_FX = 640; // where the pen settles while the camera tracks it
+const RAMP = (2 * (PEN_FX - PEN_FX0)) / (PEN.v * TRACK_K); // the camera gets up to the pen's speed over this (s)
+const CAM_X0 = PEN_X0 + (540 - PEN_FX0) / TRACK_K;
+/** How far the tracking camera has travelled tau s after the words (a smooth start, then the pen's speed). */
+const travel = (tau: number) => {
+	if (tau <= 0) return 0;
+	if (tau >= RAMP) return PEN.v * (tau - RAMP / 2);
+	const x = tau / RAMP;
+	return PEN.v * RAMP * (x ** 3 - x ** 4 / 2);
+};
+/** The whole line across the phone, under the words and then under the end card. */
+const F_END: Frame = {k: 0.6, x: (PEN_X0 + PEN.xEnd) / 2 - (500 - 540) / 0.6, y: PEN.y - (END_FY - 960) / 0.6, clip: false};
+const RELEASE = LINE_BEATS[5] + 0.12; // just after the last heartbeat is drawn
+const RELEASE_D = 0.55;
+const LINE_V = (t: number): Frame => {
+	const e = easeInOut((t - RELEASE) / RELEASE_D);
+	const k = TRACK_K * Math.pow(F_END.k / TRACK_K, e);
+	return {k, x: lerp(CAM_X0 + travel(t - F.stillDancing), F_END.x, e), y: PEN.y - (lerp(LINE_FY, END_FY, e) - 960) / k, clip: false};
+};
+
+/** 'still' / 'dancing' stacked for the phone: 280 px italic (ascenders 202 px), 'dancing' 848 px wide, centred in the safe area. */
+const WordsV: React.FC<{t: number; opacity?: number}> = ({t, opacity = 1}) => {
+	const word = (txt: string, when: number, top: number) => {
+		const k = easeOut((t - when) / 0.18);
+		return (
+			<div style={{position: 'absolute', left: 60, width: 880, top, textAlign: 'center', opacity: t >= when ? 1 : 0, transform: `translateY(${16 * (1 - k)}px) scale(${1.05 - 0.05 * k})`, transformOrigin: '50% 80%'}}>
+				{txt}
+			</div>
+		);
+	};
+	return (
+		<div style={{position: 'absolute', left: 0, top: 0, width: 1080, height: 1920, fontFamily: SERIF, fontStyle: 'italic', fontSize: 280, lineHeight: 1, color: INK.key, opacity, mixBlendMode: 'multiply', ...inked(900, 40, 12)}}>
+			{word('still', F.stillDancing, 330)}
+			{word('dancing', LINE_BEATS[1], 610)}
+		</div>
+	);
+};
+const LineWordsV: React.FC<{t: number}> = ({t}) => <WordsV t={t} />;
+
+// The end card, laid out for the phone and centred in its safe area (x 60-940, y 220-1620): the tagline in three
+// lines at 196 px (caps 141 px), the living line folded into a mark under it, and the blind-debossed name.
+const TAG_LINES = ['You don’t', 'have to die', 'to wake up.'];
+const TAG_V = {top: 470, lead: 196, size: 196};
+const MARK_FY = 1196; // the mark's frame y
+const MARK_FW = 380; // and its width
+const MARK_V = {
+	s: MARK_FW / ((PEN.xEnd - PEN_X0) * F_END.k),
+	x: F_END.x + (500 - 540) / F_END.k,
+	y: F_END.y + (MARK_FY - 960) / F_END.k,
+	w: 3 / F_END.k, // a 3 px pencil line in the frame
+};
+const BRAND_FY = 1300;
+
+const EndCardV: React.FC<{t: number}> = ({t}) => {
+	const {light, tag, brand} = endState(t);
+	return (
+		<>
+			<WordsV t={t} opacity={1 - clamp01((t - F.songEnd) / 0.22)} />
+			<div style={{position: 'absolute', left: 60, width: 880, top: TAG_V.top, textAlign: 'center', fontFamily: SERIF, fontSize: TAG_V.size, lineHeight: `${TAG_V.lead}px`, transform: `scale(${tag.s})`, transformOrigin: '50% 50%', opacity: t >= TAG_IN ? 1 : 0, ...deboss(tag.depth, 2.6, light, tag.ink)}}>
+				{TAG_LINES.map((l) => (
+					<div key={l}>{l}</div>
+				))}
+			</div>
+			<div style={{position: 'absolute', left: 60, width: 880, top: BRAND_FY, textAlign: 'center', fontFamily: ANTON, fontSize: 60, lineHeight: 1, letterSpacing: '0.42em', textIndent: '0.42em', transform: `scale(${brand.s})`, opacity: t >= BRAND_IN ? 1 : 0, ...deboss(brand.depth, 2.6, light, null)}}>
+				PROJECT PROFOUND
+			</div>
+		</>
+	);
+};
+
 /** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
-export const V: VMap = {};
+export const V: VMap = {
+	Dawn: {v: DAWN_V},
+	Postcard: {v: POST_V},
+	LivingLine: {v: LINE_V, vextra: LineWordsV},
+	EndCard: {v: () => F_END, vextra: EndCardV},
+};

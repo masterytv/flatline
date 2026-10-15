@@ -8,7 +8,7 @@ import {ANTON, hash2, INK, MONO, SERIF} from './ink';
 import {clamp01, CropMarks, easeIn, easeInOut, easeOut, inked, lerp, RegTarget, Rule, Slug, stamp, Tape} from './kit';
 import {Cam, CAM0, Plate, Sheet} from './press';
 import {CamLayer, Paper, PaperFill, Press, SheetCanvas} from './Press';
-import {VMap} from './stage';
+import {bleed, Frame, K_FILL, useStage, VMap, vtrack} from './stage';
 
 // 2:07.1 to 2:23.6, the groove (bars 68 to 76): up on the roof.
 // NoPain (68.1-70.4): the whip lands on P13, the friends bursting out of the stairwell; then a wood-type poster, one
@@ -171,18 +171,18 @@ const PrintPaper: React.FC<{pose: ReturnType<typeof printPose>; code: string}> =
 	<div
 		style={{
 			position: 'absolute',
-			left: pose.cx - PW / 2 - PM,
-			top: pose.cy - PH / 2 - PM,
-			width: PW + 2 * PM,
-			height: PH + PM + PFOOT,
-			transformOrigin: `${PW / 2 + PM}px ${PH / 2 + PM}px`,
+			left: pose.cx - pose.w / 2 - PM,
+			top: pose.cy - pose.h / 2 - PM,
+			width: pose.w + 2 * PM,
+			height: pose.h + PM + PFOOT,
+			transformOrigin: `${pose.w / 2 + PM}px ${pose.h / 2 + PM}px`,
 			transform: `rotate(${pose.rot}deg) scale(${pose.s})`,
 			boxShadow: `0 ${5 + 26 * pose.lift}px ${12 + 50 * pose.lift}px rgba(50,32,15,${0.28 + 0.14 * pose.lift})`,
 		}}
 	>
-		<Paper x={0} y={0} w={PW + 2 * PM} h={PH + PM + PFOOT} tint="#F4EEE1" />
-		<div style={{position: 'absolute', left: PM + 2, top: PH + PM + 12, fontFamily: MONO, fontSize: 15, letterSpacing: '0.14em', color: INK.key, whiteSpace: 'nowrap', mixBlendMode: 'multiply'}}>{code}</div>
-		<div style={{position: 'absolute', right: PM + 2, top: PH + PM + 12, fontFamily: MONO, fontSize: 15, letterSpacing: '0.14em', color: INK.heat, mixBlendMode: 'multiply'}}>O 15° · K 45°</div>
+		<Paper x={0} y={0} w={pose.w + 2 * PM} h={pose.h + PM + PFOOT} tint="#F4EEE1" />
+		<div style={{position: 'absolute', left: PM + 2, top: pose.h + PM + 12, fontFamily: MONO, fontSize: 15, letterSpacing: '0.14em', color: INK.key, whiteSpace: 'nowrap', mixBlendMode: 'multiply'}}>{code}</div>
+		<div style={{position: 'absolute', right: PM + 2, top: pose.h + PM + 12, fontFamily: MONO, fontSize: 15, letterSpacing: '0.14em', color: INK.heat, mixBlendMode: 'multiply'}}>O 15° · K 45°</div>
 	</div>
 );
 
@@ -235,12 +235,13 @@ const SpecimenArt: React.FC<{i: number}> = ({i}) => {
 	);
 };
 
-const Specimen: React.FC<{i: number; t: number; x: number; y: number}> = ({i, t, x, y}) => {
+const Specimen: React.FC<{i: number; t: number; x: number; y: number; k?: number; fast?: boolean}> = ({i, t, x, y, k = 1, fast}) => {
 	const s = stamp(t, WORDS[i]);
 	if (!s.on) return null;
-	const strike = easeOut((t - WORDS[i] - 2 / 30) / (4 / 30));
+	// 9:16 (fast): the phone leaves the type page on the next beat, so the strike is through in four frames
+	const strike = fast ? easeOut((t - WORDS[i] - 1 / 30) / (3 / 30)) : easeOut((t - WORDS[i] - 2 / 30) / (4 / 30));
 	return (
-		<div style={{position: 'absolute', left: x, top: y, width: SPEC_W, height: SPEC_H, transform: `rotate(${SPEC_ROT[i]}deg) scale(${s.s})`, boxShadow: '0 4px 10px rgba(50,32,15,0.28)'}}>
+		<div style={{position: 'absolute', left: x, top: y, width: SPEC_W, height: SPEC_H, transform: `rotate(${SPEC_ROT[i]}deg) scale(${s.s * k})`, boxShadow: '0 4px 10px rgba(50,32,15,0.28)'}}>
 			<Paper x={0} y={0} w={SPEC_W} h={SPEC_H} tint="#F7F2E8" />
 			<div style={{position: 'absolute', inset: 0, mixBlendMode: 'multiply', ...inked(400, i * 50, i * 30)}}>
 				<div style={{position: 'absolute', left: 12, top: 8, fontFamily: MONO, fontSize: 12, letterSpacing: '0.12em', color: INK.cold}}>{SPEC_NAMES[i]}</div>
@@ -313,10 +314,204 @@ const P13Shot: React.FC<{t: number; map: Density}> = ({t, map}) => {
 	);
 };
 
+/* 9:16: the poster re-set as a column for the phone. The type column (stage x 176-784, what the phone sees at K_FILL
+ * on x 480) carries one phrase at a time: NO stacked over its word, the word set to the full safe measure, the NO
+ * re-stamped a hair off register on every sung "no" in that line's ink (the earlier stamps ghost under it), the struck
+ * specimens piling up under the word. The prints are 2:3 upright pulls thrown onto a pile at x 1440, each cropped on its
+ * people; the phone cuts from the type to the print on the beat after the word (NOPAIN_V). On 70.3 the dive goes into
+ * the O of the last NO, which it brings to the column's centre, where the P18 lantern then sits exactly as the Light
+ * section prints it on the seam (the 480 px the dive leaves it short of 960 is the camera's own offset). */
+const VT = {x: 480, m0: 212, m1: 702};
+const V_NO_NK = 200 / CAP; // NO at a 200 px cap: 356 px on the phone
+const V_NO_X = VT.m0 - 78 * V_NO_NK; // N's ink starts on the measure
+const V_NO_BASE = 340;
+const V_WORD_TOP = 380;
+const V_NO_OFF: [number, number][] = [
+	[0, 0],
+	[6, -4],
+	[-5, 3],
+	[3, 5],
+];
+/** x extent of an outline (absolute M L H V Q Z only, as fontTools writes them). */
+const xRange = (d: string): [number, number] => {
+	const tk = d.match(/[A-Za-z]|-?\d*\.?\d+/g) ?? [];
+	let cmd = '';
+	let lo = Infinity;
+	let hi = -Infinity;
+	const see = (x: number) => {
+		lo = Math.min(lo, x);
+		hi = Math.max(hi, x);
+	};
+	for (let i = 0; i < tk.length; ) {
+		if (/[A-Za-z]/.test(tk[i])) {
+			cmd = tk[i++];
+			continue;
+		}
+		if (cmd === 'H') see(+tk[i++]);
+		else if (cmd === 'V') i++;
+		else if (cmd === 'Q') {
+			see(+tk[i]);
+			see(+tk[i + 2]);
+			i += 4;
+		} else {
+			see(+tk[i]);
+			i += 2;
+		}
+	}
+	return [lo, hi];
+};
+// each line's outline is N, the O, its counter, then the word's letters
+const V_NO_PATH = NO_LINES[0].d.split(/(?=M)/).slice(0, 3).join('');
+const V_WORDS = NO_LINES.map((l) => {
+	const word = l.d.split(/(?=M)/).slice(3).join('');
+	const [x0, x1] = xRange(word);
+	return {word, x0, nk: (VT.m1 - VT.m0) / (x1 - x0)};
+});
+const V_O_OFF = V_NO_OFF[3];
+const O_PTS_V: [number, number][] = O_COUNTER.map(([x, y]) => [V_NO_X + V_O_OFF[0] + (O_ORIGIN + x) * V_NO_NK, V_NO_BASE + V_O_OFF[1] + y * V_NO_NK]);
+const O_C_V: [number, number] = [V_NO_X + V_O_OFF[0] + (O_ORIGIN + 498) * V_NO_NK, V_NO_BASE + V_O_OFF[1] - 880 * V_NO_NK];
+const DIVE_MAX_V = 820 / (166 * V_NO_NK); // the counter ends wider than the column
+
+const diveCamV = (t: number): Cam => {
+	const k = clamp01((t - PUSH) / (F.light - PUSH));
+	const s = Math.exp(Math.log(DIVE_MAX_V) * Math.pow(k, 2.6));
+	const e = easeInOut(Math.min(1, k * 1.15));
+	return camAt(O_C_V, [lerp(O_C_V[0], VT.x, e), lerp(O_C_V[1], 540, e)], s);
+};
+
+/** A camera scaled by f about screen point q (a punch on the column rather than on the stage centre). */
+const scaleAbout = (cam: Cam, f: number, q: [number, number]): Cam => {
+	const wx = cam.cx + (q[0] - W / 2) / cam.s;
+	const wy = cam.cy + (q[1] - H / 2) / cam.s;
+	const s = cam.s * f;
+	return {...cam, s, cx: wx - (q[0] - W / 2) / s, cy: wy - (q[1] - H / 2) / s};
+};
+
+const V_SPEC = {cx: 457, cy: 770, k: 1.3};
+const V_SPEC_OFF: [number, number][] = [
+	[0, 0],
+	[12, -10],
+	[-10, 8],
+	[8, 12],
+];
+
+// the pile: 2:3 upright prints, the crop aspect matching the paper
+const VP = {x: 1440, y: 512, w: 520, h: 780};
+const pcrop = (u: number, v: number, h: number): Crop => {
+	const w = h * (VP.w / VP.h) * (1536 / 2752);
+	const x0 = Math.min(1 - w, Math.max(0, u - w / 2));
+	const y0 = Math.min(1 - h, Math.max(0, v - h / 2));
+	return [x0, y0, x0 + w, y0 + h];
+};
+/** A print on the pile: its crop, and optionally a detail re-pull of it from a later beat (finer than a camera punch:
+ * the dots stay their size on the sheet, so the face gets more of them). */
+type PrintV = {cx: number; cy: number; rot: number; crop: Crop; detail?: [number, Crop]};
+const PRINTS_V: PrintV[] = [
+	// P14 Dev doubled up, Kai on his back (69.2: Dev's laughing face re-pulled); P15 Maya up on the bench; P16 the heads
+	// together; P17 hands to the lantern
+	{cx: VP.x - 6, cy: VP.y - 4, rot: -2.2, crop: pcrop(0.455, 0.44, 0.84), detail: [bt(69, 2), pcrop(0.335, 0.5, 0.48)]},
+	{cx: VP.x + 8, cy: VP.y + 6, rot: 1.8, crop: pcrop(0.47, 0.37, 0.74)},
+	{cx: VP.x - 4, cy: VP.y + 2, rot: -1.2, crop: pcrop(0.49, 0.52, 0.64)},
+	{cx: VP.x + 4, cy: VP.y - 6, rot: 2.0, crop: pcrop(0.52, 0.34, 0.68)},
+];
+/** When each print is thrown onto the pile on the phone: on the cut to the pile, so the slap is seen. P16 only gets
+ * the 4-frame flash on 70.1 (NO CLOCK holds through the sung "clock"), so it is already down when the phone arrives. */
+const LAND_V = [beatAfter(WORDS[0]), beatAfter(WORDS[1]), WORDS[2], beatAfter(WORDS[3])];
+const printPoseV = (p: PrintV, n: number, t0: number, t: number) => {
+	const e = easeOut((t - t0) / THROW);
+	let cx = lerp(p.cx + 330, p.cx, e);
+	let cy = lerp(p.cy - 240, p.cy, e);
+	let rot = lerp(p.rot + 11, p.rot, e);
+	const s = lerp(1.07, 1, e);
+	if (t >= PUSH) {
+		const j = easeOut((t - PUSH) / (3 / 30));
+		cx = lerp(cx, VP.x + (3 - n) * 3, j);
+		cy = lerp(cy, VP.y - (3 - n) * 2, j);
+		rot = lerp(rot, (3 - n) * 0.35, j);
+	}
+	return {w: VP.w, h: VP.h, cx, cy, rot, s, lift: 1 - e};
+};
+const NoPainV: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
+	const pushing = t >= PUSH;
+	const cam = pushing ? diveCamV(t) : beatHit(CAM0, t, 1);
+	// the slam lands on the column, not on the stage centre
+	const camS = scaleAbout(cam, punch(t, WORDS[0], 0.035, 0.16), [VT.x, 540]);
+	const g = camG(camS);
+	const n = WORDS.filter((w) => t >= w).length - 1;
+	const word = V_WORDS[n];
+	const sw = stamp(t, WORDS[n]);
+	const capW = CAP * word.nk;
+	const capNo = CAP * V_NO_NK;
+	const landed = PRINTS.filter((_, i) => t >= LAND_V[i]);
+	const top = landed.length - 1;
+	const shown = landed.filter((_, i) => i >= top - 2);
+	const win = toScreen(camS, O_C_V);
+	const clip = O_PTS_V.map((p) => toScreen(camS, p))
+		.map(([x, y]) => `${x.toFixed(1)}px ${y.toFixed(1)}px`)
+		.join(', ');
+	return (
+		<AbsoluteFill style={{background: INK.paper}}>
+			{pushing && <PaperFill />}
+			<CamLayer cam={camS}>
+				{!pushing && <Paper />}
+				<Slug x={VT.m0} y={92} text="THE ROOF · 02:08 · WOOD TYPE · TWO INKS" size={15} />
+				<Slug x={VT.m0} y={884} text="TOKTIC · UI SPECIMENS · STRUCK" size={15} color={INK.cold} />
+				<Slug x={VP.x - VP.w / 2} y={60} text="THE ROOF · 4 PULLS · 2:3 · O 15° K 45°" size={15} />
+				<Rule x={60} y={970} w={1800} t={t} amp={22} width={3} />
+			</CamLayer>
+			<svg viewBox={`0 0 ${W} ${H}`} style={{...svgFull, mixBlendMode: 'multiply', ...inked(1024, 0, 0, true)}}>
+				<g transform={g}>
+					{V_NO_OFF.slice(0, n + 1).map(([ox, oy], i) => {
+						const s = stamp(t, WORDS[i]);
+						// the earlier impressions ghost in heat, so they read as the plate off register (a key ghost reads as a shadow)
+						return (
+							<g key={i} opacity={i === n ? 1 : 0.5} transform={`translate(${V_NO_X + ox} ${V_NO_BASE + oy - capNo / 2}) scale(${s.s}) translate(0 ${capNo / 2}) scale(${V_NO_NK})`}>
+								<path d={V_NO_PATH} fill={i === n ? LINE_INK[i] : INK.heat} />
+							</g>
+						);
+					})}
+					<g transform={`translate(${VT.m0} ${V_WORD_TOP + capW / 2}) scale(${sw.s}) translate(${-word.x0 * word.nk} ${capW / 2}) scale(${word.nk})`}>
+						<path d={word.word} fill={LINE_INK[n]} />
+					</g>
+				</g>
+			</svg>
+			<CamLayer cam={camS}>
+				{[0, 1, 2, 3].map((i) => (
+					<Specimen key={i} i={i} t={t} x={V_SPEC.cx - SPEC_W / 2 + V_SPEC_OFF[i][0]} y={V_SPEC.cy - SPEC_H / 2 + V_SPEC_OFF[i][1]} k={V_SPEC.k} fast />
+				))}
+			</CamLayer>
+			{shown.map((p) => {
+				const i = PRINTS.indexOf(p);
+				const pv = PRINTS_V[i];
+				const pose = printPoseV(pv, i, LAND_V[i], t);
+				const detail = pv.detail && t >= pv.detail[0] && t < PUSH ? pv.detail : undefined;
+				const s = pose.s * (detail ? punch(t, detail[0], 0.03, 0.18) : 1);
+				const off = pushing ? 0 : 1;
+				return (
+					<React.Fragment key={p.id}>
+						<CamLayer cam={camS}>
+							<PrintPaper pose={pose} code={detail ? `${p.code.split(' · ').slice(0, 2).join(' · ')} · DETAIL` : p.code} />
+						</CamLayer>
+						<Press cam={camS} sheets={[{map: d[p.id], w: VP.w, h: VP.h, cx: pose.cx, cy: pose.cy, rot: pose.rot, s, crop: detail ? detail[1] : pv.crop, seed: p.seed, plates: heatKey(6.5, {hx: 4 * off, hy: -3 * off, kx: -1 * off})}]} />
+					</React.Fragment>
+				);
+			})}
+			{pushing && (
+				<div style={{position: 'absolute', inset: 0, clipPath: `polygon(${clip})`}}>
+					<PaperFill />
+					<Press sheets={[{map: d.P18, ...p18Through(win), seed: 18, plates: [p18Plate()]}]} />
+				</div>
+			)}
+		</AbsoluteFill>
+	);
+};
+
 export const NoPain: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P13', 'P14', 'P15', 'P16', 'P17', 'P18']);
+	const {vertical} = useStage();
 	if (!d) return <AbsoluteFill style={{background: INK.paper}} />;
 	if (t < WORDS[0]) return <P13Shot t={t} map={d.P13} />;
+	if (vertical) return <NoPainV t={t} d={d} />;
 	const pushing = t >= PUSH;
 	const cam = pushing ? diveCam(t) : beatHit(CAM0, t, 1);
 	// the poster slams over P13 on 68.3
@@ -426,8 +621,12 @@ const LightWord: React.FC<{t: number; t0: number; text: string; y: number; size:
 	);
 };
 
+// 9:16: the two lines set to the phone's safe width on the lantern, which the phone holds full bleed
+const V_LIGHT = {size: 114, y: [300, 440]};
+
 export const Light: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P18', 'P19']);
+	const {vertical} = useStage();
 	if (!d) return <AbsoluteFill style={{background: INK.paper}} />;
 	if (t < WHITE) {
 		// the dive lands: the lantern settles from where the counter left it, then the slow push of the light
@@ -448,8 +647,8 @@ export const Light: React.FC<{t: number}> = ({t}) => {
 				<PaperFill />
 				<Press sheets={[sheet]} />
 				<div style={{position: 'absolute', inset: 0}}>
-					<LightWord t={t} t0={JUST} text="just light," y={262} size={150} />
-					<LightWord t={t} t0={BRIGHT} text="so bright" y={418} size={150} />
+					<LightWord t={t} t0={JUST} text="just light," y={vertical ? V_LIGHT.y[0] : 262} size={vertical ? V_LIGHT.size : 150} />
+					<LightWord t={t} t0={BRIGHT} text="so bright" y={vertical ? V_LIGHT.y[1] : 418} size={vertical ? V_LIGHT.size : 150} />
 				</div>
 			</AbsoluteFill>
 		);
@@ -487,7 +686,8 @@ export const Light: React.FC<{t: number}> = ({t}) => {
 			<PaperFill />
 			<Press sheets={[{map: d.P19, ...FULL, s, seed: 19, plates}]} />
 			{sheetMarks}
-			{/* 'I'm not the same', knocked out of the night sky: it appears as the ink comes back round it */}
+			{/* 'I'm not the same', knocked out of the night sky: it appears as the ink comes back round it (9:16: the phone
+			    looks at the sky with the words on 71.4, then whips onto her face for the key on 72.1) */}
 			<div style={{position: 'absolute', left: 92, top: 196, fontFamily: SERIF, fontStyle: 'italic', fontSize: 118, lineHeight: 0.98, color: INK.paper, opacity: words > 0 ? 1 : 0}}>
 				I'm not
 				<br />
@@ -556,7 +756,26 @@ const TimeStamp: React.FC<{t: number; t0: number; x: number; y: number; text: st
 	);
 };
 
-const TimeCardFace: React.FC<{t: number; m1: Density}> = ({t, m1}) => {
+// 9:16: 'gone' is written into the empty photo box, with an arrow down to the time she clocked out; her photo is
+// taped over it on 73.1. 'four minutes' is written under the card (the phone's camera runs past the stage edge there).
+const V_GONE = {x: PHOTO.x + 20, y: PHOTO.y + 96, size: 116};
+const V_FOUR = {x: 742, y: 1078, size: 118};
+const VGone: React.FC<{t: number}> = ({t}) => {
+	const s = stamp(t, GONE);
+	if (!s.on) return null;
+	const draw = easeOut((t - GONE - 2 / 30) / 0.2);
+	return (
+		<>
+			<div style={{position: 'absolute', left: V_GONE.x, top: V_GONE.y, fontFamily: SERIF, fontStyle: 'italic', fontSize: V_GONE.size, lineHeight: 1, color: INK.heat, transform: `rotate(-8deg) scale(${s.s})`, transformOrigin: '30% 60%', mixBlendMode: 'multiply'}}>gone</div>
+			<svg style={{position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', mixBlendMode: 'multiply'}}>
+				<path d="M 560 452 C 560 520, 548 566, 512 612" fill="none" stroke={INK.heat} strokeWidth={6} strokeLinecap="round" strokeDasharray="200" strokeDashoffset={200 * (1 - draw)} />
+				<path d="M 494 588 L 510 616 L 538 604" fill="none" stroke={INK.heat} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" opacity={draw >= 1 ? 1 : 0} />
+			</svg>
+		</>
+	);
+};
+
+const TimeCardFace: React.FC<{t: number; m1: Density; vertical?: boolean}> = ({t, m1, vertical}) => {
 	const ruled = 'rgba(255,95,31,0.55)';
 	const tape = t >= TAPE;
 	const tp = tape ? easeOut((t - TAPE) / (4 / 30)) : 0;
@@ -583,7 +802,7 @@ const TimeCardFace: React.FC<{t: number; m1: Density}> = ({t, m1}) => {
 				</div>
 				{/* the photo box */}
 				<div style={{position: 'absolute', left: PHOTO.x - 6, top: PHOTO.y - 6, width: PHOTO.w + 12, height: PHOTO.h + 12, border: `2px solid ${INK.key}`}} />
-				{!tape && <div style={{position: 'absolute', left: PHOTO.x, top: PHOTO.y + PHOTO.h / 2 - 10, width: PHOTO.w, textAlign: 'center', fontFamily: MONO, fontSize: 14, letterSpacing: '0.2em', color: INK.key, opacity: 0.7}}>PHOTO</div>}
+				{!tape && !(vertical && t >= GONE) && <div style={{position: 'absolute', left: PHOTO.x, top: PHOTO.y + PHOTO.h / 2 - 10, width: PHOTO.w, textAlign: 'center', fontFamily: MONO, fontSize: 14, letterSpacing: '0.2em', color: INK.key, opacity: 0.7}}>PHOTO</div>}
 				<div style={{position: 'absolute', left: 38, right: 38, top: 532, height: 4, background: INK.key}} />
 				{['IN / OUT', 'TIME'].map((s, i) => (
 					<div key={s} style={{position: 'absolute', left: [38, 300][i], top: 548, fontFamily: MONO, fontSize: 18, letterSpacing: '0.16em', color: INK.key}}>
@@ -602,6 +821,7 @@ const TimeCardFace: React.FC<{t: number; m1: Density}> = ({t, m1}) => {
 			<TimeStamp t={t} t0={IN} x={44} y={716} text="IN" size={70} rot={1.2} />
 			<TimeStamp t={t} t0={IN} x={300} y={714} text="01:52" size={76} rot={1.2} />
 			<TimeStamp t={t} t0={TOTAL} x={286} y={850} text="4:00" color={INK.heat} size={80} rot={-6} box />
+			{vertical && <VGone t={t} />}
 			{tape && (
 				<div style={{position: 'absolute', left: PHOTO.x, top: PHOTO.y, width: PHOTO.w, height: PHOTO.h, transform: `rotate(${lerp(9, 2.5, tp)}deg) scale(${lerp(1.12, 1, tp)})`, transformOrigin: '50% 40%', boxShadow: '0 3px 8px rgba(50,32,15,0.3)'}}>
 					<Paper x={0} y={0} w={PHOTO.w} h={PHOTO.h} tint="#F7F2E8" />
@@ -715,6 +935,7 @@ const COUNTER_WORDS = [
 const camG = (cam: Cam) => `translate(${W / 2} ${H / 2}) rotate(${cam.rot ?? 0}) scale(${cam.s}) translate(${-cam.cx} ${-cam.cy})`;
 
 const Infinity8: React.FC<{t: number; map: Density; cam: Cam}> = ({t, map, cam}) => {
+	const {vertical} = useStage();
 	const {cx, cy, r} = stepAt(t);
 	const pts = infPts(cx, cy, r);
 	const sw = INF_W * r;
@@ -755,7 +976,8 @@ const Infinity8: React.FC<{t: number; map: Density; cam: Cam}> = ({t, map, cam})
 								textAlign: 'center',
 								fontFamily: SERIF,
 								fontStyle: 'italic',
-								fontSize: rho * w.size,
+								// 9:16: the phone holds one counter full bleed; 'forever' is set a size down to fit the safe width
+								fontSize: rho * (vertical && w.side > 0 ? 0.42 : w.size),
 								lineHeight: 1,
 								color: w.ink,
 								mixBlendMode: 'multiply',
@@ -774,11 +996,13 @@ const Infinity8: React.FC<{t: number; map: Density; cam: Cam}> = ({t, map, cam})
 
 export const TimeCard: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['M1', 'P20']);
+	const {vertical} = useStage();
 	if (!d) return <AbsoluteFill style={{background: INK.paper}} />;
 	const slap = punch(t, OUT, 0.06, 0.16);
 	const spin = -7 * (1 - easeOut((t - OUT) / 0.16)); // it lands turning
 	const cut = [OUT, GONE, IN, TAPE, TOTAL].filter((c) => t >= c).pop() ?? OUT;
-	const c0 = cardCam(t);
+	// 9:16: the rostrum stays square on the page and the phone's camera (TIMECARD_V) does the framing
+	const c0 = vertical ? CAM0 : cardCam(t);
 	const drift = 1 + 0.012 * clamp01((t - cut) / 0.9);
 	// from 'forever' the page is under the ∞'s rostrum
 	const cam = t >= FOREVER ? infCam(t) : beatHit({...c0, s: c0.s * punch(t, cut, 0.035, 0.2) * drift}, t, 0.8);
@@ -793,12 +1017,19 @@ export const TimeCard: React.FC<{t: number}> = ({t}) => {
 			<CamLayer cam={cam}>
 				<Paper />
 				{/* the lyric, in the human voice, beside the card */}
-				{wide && (
+				{!vertical && wide && (
 					<div style={{position: 'absolute', left: 168, top: 572, fontFamily: SERIF, fontStyle: 'italic', fontSize: 150, lineHeight: 1, color: INK.heat, transform: `rotate(-7deg) scale(${stamp(t, GONE).s})`, mixBlendMode: 'multiply'}}>
 						gone
 					</div>
 				)}
-				{t >= TOTAL && t < FOREVER && (
+				{vertical && t >= TOTAL && t < FOREVER && (
+					<div style={{position: 'absolute', left: V_FOUR.x, top: V_FOUR.y, fontFamily: SERIF, fontStyle: 'italic', fontSize: V_FOUR.size, lineHeight: 0.92, color: INK.heat, transform: `rotate(-5deg) scale(${stamp(t, TOTAL).s})`, transformOrigin: '20% 50%', mixBlendMode: 'multiply'}}>
+						four
+						<br />
+						minutes
+					</div>
+				)}
+				{!vertical && t >= TOTAL && t < FOREVER && (
 					<div style={{position: 'absolute', left: CARD_X + CARD.w + 50, top: 820, fontFamily: SERIF, fontStyle: 'italic', fontSize: 112, lineHeight: 0.95, color: INK.heat, transform: `rotate(-5deg) scale(${stamp(t, TOTAL).s})`, transformOrigin: '0 50%', mixBlendMode: 'multiply'}}>
 						four
 						<br />
@@ -816,11 +1047,11 @@ export const TimeCard: React.FC<{t: number}> = ({t}) => {
 							boxShadow: `0 ${18 - 10 * tip}px ${40 - 20 * tip}px rgba(50,32,15,0.28)`,
 						}}
 					>
-						<TimeCardFace t={t} m1={d.M1} />
+						<TimeCardFace t={t} m1={d.M1} vertical={vertical} />
 					</div>
 				</div>
 				{/* the arrow lands on the card, pointing at OUT */}
-				{wide && (
+				{!vertical && wide && (
 					<svg style={{position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', mixBlendMode: 'multiply'}}>
 						<path d={`M 470 718 C 520 690, 560 676, ${CARD_X + 30} 660`} fill="none" stroke={INK.heat} strokeWidth={6} strokeLinecap="round" strokeDasharray="420" strokeDashoffset={420 * (1 - easeOut((t - GONE) / 0.18))} />
 						<path d={`M ${CARD_X + 6} 642 L ${CARD_X + 34} 660 L ${CARD_X + 8} 682`} fill="none" stroke={INK.heat} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" opacity={t >= GONE + 0.15 ? 1 : 0} />
@@ -939,5 +1170,107 @@ export const Strips: React.FC<{t: number}> = ({t}) => {
 	);
 };
 
+/* ------------------------------------------------------------------------------------------------------------ */
+/* 9:16                                                                                                         */
+
+/** The hand-over contract with the neighbours' sections: full bleed on the stage centre. */
+const SEAM: Frame = {k: K_FILL, x: 960, y: 540};
+const TYPE_V: Frame = {k: K_FILL, x: VT.x, y: 540};
+const PILE_V = bleed(VP.x, VP.y + 16, 1.9);
+/** In on P14's detail re-pull: the print's image bleeds off both sides, its paper border and foot just in frame. */
+const DETAIL_V = bleed(PRINTS_V[0].cx, PRINTS_V[0].cy, 2.3);
+
+/**
+ * No pain on the phone. 68.1 the whip lands on the seam and runs on to the five in the doorway; 68.2 the cut-in on Maya
+ * and Jess; 68.3 Maya's face; 68.4 Sam. Then on every sung "no" the type column (NO over the word, the struck
+ * specimen under it), and on the beat after it the print thrown onto the pile as the phone cuts to it: 69.1 P14 lands,
+ * 69.2 in on its detail re-pull, Dev's laughing face; 69.4 P15 lands, Maya on the bench; 70.1 P16, the heads together
+ * (a flash: NO CLOCK holds through the sung "clock"); 70.2 P17 lands, the hands at the lantern. 70.3 back on the column
+ * for the dive into the O.
+ */
+const NOPAIN_V = vtrack([
+	[F.groove, SEAM],
+	[F.groove + 0.36, bleed(1015), 0.22],
+	[P13_CUT, bleed(955)],
+	[P13_CLOSE, bleed(850)],
+	[bt(68, 4), bleed(1430)],
+	[WORDS[0], TYPE_V],
+	[beatAfter(WORDS[0]), PILE_V],
+	[bt(69, 2), DETAIL_V],
+	[WORDS[1], TYPE_V],
+	[beatAfter(WORDS[1]), PILE_V],
+	[WORDS[2], TYPE_V],
+	[bt(70), PILE_V],
+	[WORDS[3], TYPE_V],
+	[beatAfter(WORDS[3]), PILE_V],
+	[PUSH, TYPE_V],
+]);
+
+/**
+ * Just light on the phone. 70.4 the dive lands on the lantern on the seam; 71.1 'just light,' pushes in on the
+ * lantern; 71.2 'so bright' pulls back as the light eats the sheet; 71.3 the white-out, full bleed, breathing in on
+ * the blank sheet; 71.4 P19 prints back: the phone looks at the night sky left of her, where 'I'm not the same' is
+ * knocked out as the ink comes round it (the 16:9 placement, whole in the frame); 72.1 a whip onto her laughing face
+ * as the key plate lands.
+ */
+const LIGHT_V = vtrack([
+	[F.light, SEAM],
+	[JUST, bleed(960, 505, 2), 0.16],
+	[BRIGHT, bleed(960)],
+	// the white-out full bleed, breathing in on the blank sheet (no dots to shimmer)
+	[WHITE, SEAM],
+	[GROW - 0.01, bleed(960, 540, 2), 0.42],
+	[GROW, bleed(305)],
+	[KEY19, bleed(1012, 380, 2.3), 0.15],
+]);
+
+const card = (k: number, x: number, y: number): Frame => ({k, x, y, clip: false});
+
+/**
+ * The time card on the phone, a new mark read on every beat; the phone's camera runs past the stage edge (clip off)
+ * so the card can be travelled. 72.2 the card lands whole with OUT 01:48; 72.3 'gone' written into its empty photo
+ * box, the arrow down to 01:48; 72.4 the rows, OUT 01:48 / IN 01:52; 73.1 her photo taped over 'gone'; 73.2 the foot
+ * of the card, TOTAL 4:00 and 'four minutes' written under it; 73.3 'forever': the whole ∞ stamped on the sheet as
+ * the card drops away; 73.4 in on the crossing as the key lands, their joined hands where the strokes cross; 74.1
+ * 'free' in the left counter under Jess; 74.2 'forever' in the right one under Sam.
+ */
+const TIMECARD_V = vtrack([
+	[OUT, card(1.22, 960, 575)],
+	[GONE, card(2.3, 1088, 474)],
+	// the card's left column (Maya, OUT, IN) clear of the frame's edge; 'gone', read on the beat before, at the right
+	[IN, card(1.5, 925, 742)],
+	[TAPE, card(2.7, 1159, 388)],
+	[TOTAL, card(1.7, 905, 955)],
+	[FOREVER, {k: 0.63, x: 960, y: 548}],
+	[KEY20, bleed(960)],
+	// left of the counter's centre, so Jess's face (stage 386, 177 on this step) is on the band in frame, 'free' still inside the safe width
+	[MARCH[0], bleed(STEPS[1].cx - INF_C * STEPS[1].r - 62, STEPS[1].cy)],
+	[MARCH[1], bleed(STEPS[2].cx + INF_C * STEPS[2].r, STEPS[2].cy)],
+]);
+
+// P23's people across the strips (stage x = 40 + 1840 u)
+const P23_X = (u: number) => SA.cx - SA.w / 2 + u * SA.w;
+
+/**
+ * Strips on the phone, a framing per beat. 74.3 the faces out of phase, full bleed; 74.4 punched in on them; 75.1
+ * the swap; 75.2 in again; 75.3 'together': the strips snap into P23 and the phone pulls back to the whole line of
+ * the five, lying on the newsprint; 75.4 Maya with Kai and Dev; 76.1 the key-only flash on Jess and Kai; 76.2 Dev and Sam; 76.3 the scatter onto
+ * the phone on the counter; 76.4 the push onto it, where the receipt (s_back) picks up.
+ */
+const STRIPS_V = vtrack([
+	[F.together, bleed(960)],
+	[bt(74, 4), bleed(960, 385, 2.6)],
+	[SWAP, bleed(990)],
+	[bt(75, 2), bleed(940, 400, 2.3)],
+	// the five whole, Jess's face (u 0.18-0.26) to Sam's (0.79-0.85): the healed line lying on the newsprint for a beat
+	[TOGETHER, {k: 0.8, x: (P23_X(0.182) + P23_X(0.85)) / 2, y: 540}],
+	[bt(75, 4), bleed(P23_X(0.52))],
+	[KEYFLASH, bleed(P23_X(0.3))],
+	[bt(76, 2), bleed(P23_X(0.73))],
+	[SCATTER, bleed(1090)],
+	// exactly where the receipt (s_back STRIPS_END) picks P24 up on 77.1
+	[LAST, bleed(1150, 640, 2.2)],
+]);
+
 /** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
-export const V: VMap = {};
+export const V: VMap = {NoPain: {v: NOPAIN_V}, Light: {v: LIGHT_V}, TimeCard: {v: TIMECARD_V}, Strips: {v: STRIPS_V}};
