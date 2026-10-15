@@ -8,6 +8,7 @@ import {ANTON, hash2, INK, MONO, SERIF} from './ink';
 import {clamp01, CropMarks, easeOut, ecg, inked, kickNudge, RegTarget, Slug, stamp} from './kit';
 import {Cam, Plate, Sheet} from './press';
 import {CamLayer, Paper, Press} from './Press';
+import {VMap} from './stage';
 
 // 1:32.2–1:41.4: the progressive proofs of P1 on the 1:32 "Flatline", then "My heart stopped... and I started"
 // as type on ECG paper (graft 2, Monitor's real stop restyled into ink).
@@ -627,3 +628,6 @@ export const Heart: React.FC<{t: number}> = ({t}) => {
 		</AbsoluteFill>
 	);
 };
+
+/** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
+export const V: VMap = {};

@@ -8,6 +8,7 @@ import {clamp01, CropMarks, easeOut, inked, kickNudge, lerp, RegTarget, Rule, Sl
 import {Cam, Plate, plateDots, Sheet, sheetMatrix} from './press';
 import {CamLayer, Paper, Press} from './Press';
 import {KeepsakePrint} from './s_keepsake';
+import {VMap} from './stage';
 
 // 3:07.8 to 3:21.9, the final drop back in the living room.
 // Macros: one giant halftone close-up per beat (P41-P43), heat + key only, cream and orange stock in turn.
@@ -660,3 +661,6 @@ export const rollCorners = (t: number) =>
 		const pts = ([[-1, -1], [1, -1], [1, 1], [-1, 1]] as const).map(([a, b]) => [pcx + a * hw * Math.cos(r) - b * hh * Math.sin(r), pcy + a * hw * Math.sin(r) + b * hh * Math.cos(r)]);
 		return {id: p.id, pts};
 	});
+
+/** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
+export const V: VMap = {};

@@ -8,6 +8,7 @@ import {clamp01, CropMarks, easeIn, easeInOut, easeOut, ecg, FlatlineBar, inked,
 import {bbox, FRIENDS, Friend, inPoly, P11_SPIN, P12_MAYA, P7_FACES, P7_HAND, P7_LAMP, P7_PALM, P7_PEOPLE, P7_PHONES, P7_PULL, P8_LAMP, P9_GAP, Poly} from './masks';
 import {Cam, Plate, plateDots, Sheet, sheetMatrix} from './press';
 import {CamLayer, Paper, Press} from './Press';
+import {VMap} from './stage';
 
 // 1:56.1-2:07.1, drop 2 (bars 62-67).
 // Couch (62.1-64.4): the black FLATLINE sheet peels off P7, printed cold (the screen world): four friends on the sofa,
@@ -830,3 +831,6 @@ export const Join: React.FC<{t: number}> = ({t}) => {
 		</AbsoluteFill>
 	);
 };
+
+/** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
+export const V: VMap = {};

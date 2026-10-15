@@ -9,6 +9,7 @@ import {clamp01, easeIn, easeInOut, easeOut, ecg, inked, kickNudge, lerp, slap, 
 import {inPoly, Poly} from './masks';
 import {CAM0, Plate, Sheet, sheetMatrix} from './press';
 import {OnSheet, Paper, PaperFill, Press} from './Press';
+import {VMap} from './stage';
 
 // 2:23.6–2:38.2 "Beep, beep, beep, I'm coming back ... I came back to life to feel everything!"
 // Sam put Maya's phone on charge in the kitchen and it fights back. Its own things are lime (the screen, the Stay
@@ -944,3 +945,6 @@ export const TearOff: React.FC<{t: number}> = ({t}) => {
 		</AbsoluteFill>
 	);
 };
+
+/** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
+export const V: VMap = {};

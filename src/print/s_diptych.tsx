@@ -6,6 +6,7 @@ import {hash2, INK, SERIF} from './ink';
 import {clamp01, CropMarks, easeIn, easeInOut, easeOut, inked, kickNudge, lerp, RegTarget, Slug, slap, stamp, Tape} from './kit';
 import {Cam, Plate, Sheet} from './press';
 import {CamLayer, Paper, Press, SheetCanvas} from './Press';
+import {VMap} from './stage';
 
 // 2:52.8 to 3:07.8, build 3: the walk back (bars 93 to 101.1).
 // Diptych: the zine, before and after. P34 (earlier, lit by her phone) printed cold on the left page; a flat cold
@@ -1009,3 +1010,6 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 		</AbsoluteFill>
 	);
 };
+
+/** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
+export const V: VMap = {};

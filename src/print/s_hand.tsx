@@ -11,6 +11,7 @@ import {Cam, Plate, Sheet} from './press';
 import {CamLayer, Paper, Press} from './Press';
 import {P1_PLATES, POSTER, posterSheet, sheetCam, SheetMarks, WIRE_Y} from './s_drop';
 import {MonoText, P, Part, PartShape, PartState} from './s_hand_parts';
+import {VMap} from './stage';
 
 // 1:24.8 to 1:32.2 (bars 45-48): GRAFT 1, Uninstall's drop-1 hand-over printed in Proof of Life's inks.
 // The phone shatters on a cream flash. Its 56 shards (the frozen kick-out screen: O27 under the Clear! crack, now
@@ -968,3 +969,6 @@ export const HandOver: React.FC<{t: number}> = ({t}) => {
 		</AbsoluteFill>
 	);
 };
+
+/** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
+export const V: VMap = {};

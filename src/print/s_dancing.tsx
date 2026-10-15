@@ -8,6 +8,7 @@ import {clamp01, easeIn, easeOut, ecg, FlatlineBar, inked, kickNudge, lerp, RegT
 import {bbox, FRIENDS, inPoly, P7_PHONES, Poly} from './masks';
 import {Cam, Plate, Sheet} from './press';
 import {CamLayer, Paper, PaperFill, Press} from './Press';
+import {VMap} from './stage';
 
 // 1:41.4 to 1:56.1, the first dance (bars 54 to 61).
 // DancingWord: DANCING knocked out of a black flood, its letters the only windows onto P2, then an
@@ -556,3 +557,6 @@ export const ReversePull: React.FC<{t: number}> = ({t}) => {
 		</AbsoluteFill>
 	);
 };
+
+/** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
+export const V: VMap = {};

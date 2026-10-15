@@ -9,6 +9,7 @@ import {clamp01, easeIn, easeInOut, easeOut, ecg, inked, lerp} from './kit';
 import {Cam, Plate, Sheet, sheetMatrix} from './press';
 import {KeepsakePrint} from './s_keepsake';
 import {CamLayer, OnSheet, Paper, PaperFill, Press} from './Press';
+import {VMap} from './stage';
 
 // 3:21.9 to the end card: sunrise as a split fountain (the night's ultramarine pushed off the top of the sheet by
 // the warm ink), the morning-after postcards and TokTic's last stub (0 MIN · BATTERY 100%), the living line drawn
@@ -495,3 +496,6 @@ export const EndCard: React.FC<{t: number}> = ({t}) => {
 		</AbsoluteFill>
 	);
 };
+
+/** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
+export const V: VMap = {};

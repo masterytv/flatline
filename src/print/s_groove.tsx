@@ -8,6 +8,7 @@ import {ANTON, hash2, INK, MONO, SERIF} from './ink';
 import {clamp01, CropMarks, easeIn, easeInOut, easeOut, inked, lerp, RegTarget, Rule, Slug, stamp, Tape} from './kit';
 import {Cam, CAM0, Plate, Sheet} from './press';
 import {CamLayer, Paper, PaperFill, Press, SheetCanvas} from './Press';
+import {VMap} from './stage';
 
 // 2:07.1 to 2:23.6, the groove (bars 68 to 76): up on the roof.
 // NoPain (68.1-70.4): the whip lands on P13, the friends bursting out of the stairwell; then a wood-type poster, one
@@ -937,3 +938,6 @@ export const Strips: React.FC<{t: number}> = ({t}) => {
 		</AbsoluteFill>
 	);
 };
+
+/** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
+export const V: VMap = {};

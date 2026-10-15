@@ -9,6 +9,7 @@ import {clamp01, CropMarks, easeOut, inked, kickNudge, lerp, stamp} from './kit'
 import {Poly} from './masks';
 import {Cam, CAM0, Plate, Sheet, sheetMatrix} from './press';
 import {CamLayer, PaperFill, Press} from './Press';
+import {VMap} from './stage';
 
 // 2:38.2–2:52.8, drop 3 (bars 85–92), instrumental. GRAFT 3, in place of the old phone table.
 // On the downbeat Maya flips her lime phone face-down; the friends stack theirs on top. The top phone of the
@@ -894,3 +895,6 @@ export const InkBattery: React.FC<{t: number}> = ({t}) => {
 	if (t < TRIP) return <Batteries t={t} d={d} />;
 	return <Triptych t={t} d={d} />;
 };
+
+/** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
+export const V: VMap = {};

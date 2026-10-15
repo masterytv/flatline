@@ -1,8 +1,9 @@
 import React, {useLayoutEffect, useRef} from 'react';
-import {AbsoluteFill, Img, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Img} from 'remotion';
 import {PAPER_URL} from './density';
 import {INK} from './ink';
 import {CAM0, Cam, drawSheet, Sheet, sheetMatrix} from './press';
+import {useStage} from './stage';
 
 /** A full-frame canvas that prints sheets through the camera (crisp at any zoom). Multiplies onto what is below. */
 export const Press: React.FC<{sheets: Sheet[]; cam?: Cam; style?: React.CSSProperties; blend?: boolean; draw?: (ctx: CanvasRenderingContext2D, W: number, H: number) => void}> = ({
@@ -12,7 +13,10 @@ export const Press: React.FC<{sheets: Sheet[]; cam?: Cam; style?: React.CSSPrope
 	blend = true,
 	draw,
 }) => {
-	const {width, height} = useVideoConfig();
+	// the stage size; in the 9:16 cut the reframing camera may zoom in, so the canvas draws at `res` times the stage
+	const {w: width, h: height, res} = useStage();
+	const W = Math.round(width * res);
+	const H = Math.round(height * res);
 	const ref = useRef<HTMLCanvasElement>(null);
 	useLayoutEffect(() => {
 		const cv = ref.current;
@@ -20,11 +24,22 @@ export const Press: React.FC<{sheets: Sheet[]; cam?: Cam; style?: React.CSSPrope
 		const ctx = cv.getContext('2d')!;
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		ctx.globalCompositeOperation = 'source-over';
-		ctx.clearRect(0, 0, width, height);
-		for (const s of sheets) drawSheet(ctx, s, sheetMatrix(s, cam, width, height), width, height);
-		if (draw) draw(ctx, width, height);
+		ctx.clearRect(0, 0, W, H);
+		for (const s of sheets) drawSheet(ctx, s, sheetMatrix(s, cam, width, height, res), W, H);
+		if (draw) {
+			// draw callbacks work in stage px: scale every transform they set by res
+			const set = ctx.setTransform.bind(ctx) as (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+			const scaled = (a: number, b: number, c: number, d: number, e: number, f: number) => set(a * res, b * res, c * res, d * res, e * res, f * res);
+			(ctx as unknown as {setTransform: typeof scaled}).setTransform = scaled;
+			try {
+				ctx.setTransform(1, 0, 0, 1, 0, 0);
+				draw(ctx, width, height);
+			} finally {
+				(ctx as unknown as {setTransform: typeof scaled}).setTransform = set;
+			}
+		}
 	});
-	return <canvas ref={ref} width={width} height={height} style={{position: 'absolute', inset: 0, width: '100%', height: '100%', mixBlendMode: blend ? 'multiply' : 'normal', ...style}} />;
+	return <canvas ref={ref} width={W} height={H} style={{position: 'absolute', left: 0, top: 0, width, height, mixBlendMode: blend ? 'multiply' : 'normal', ...style}} />;
 };
 
 /** One sheet printed in its own paper space (for elements that take CSS 3D transforms: doors, page turns, pop-ups). */
@@ -47,7 +62,7 @@ export const SheetCanvas: React.FC<{sheet: Omit<Sheet, 'cx' | 'cy'>; res?: numbe
 
 /** DOM layer in world coordinates, seen through the same camera as the press. */
 export const CamLayer: React.FC<{cam?: Cam; children: React.ReactNode; style?: React.CSSProperties}> = ({cam = CAM0, children, style}) => {
-	const {width, height} = useVideoConfig();
+	const {w: width, h: height} = useStage();
 	return (
 		<div
 			style={{
