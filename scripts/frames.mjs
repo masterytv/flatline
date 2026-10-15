@@ -3,6 +3,7 @@
 // Set FRAMES_ENTRY to render from another entry file (default src/index.ts), e.g. a prototype's own index.ts.
 import {bundle} from '@remotion/bundler';
 import {renderStill, selectComposition} from '@remotion/renderer';
+import fs from 'node:fs';
 import path from 'node:path';
 
 const [id, outDir, scale, ...secs] = process.argv.slice(2);
@@ -15,3 +16,5 @@ for (const s of secs) {
 	process.stdout.write(`${s} `);
 }
 console.log();
+// Each bundle is about 600 MB in /tmp; remove it so repeated checks don't fill the disk.
+fs.rmSync(serveUrl, {recursive: true, force: true});

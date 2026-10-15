@@ -5,7 +5,7 @@ export const INK = {
 	key: '#1B1A17', // warm black
 	heat: '#FF5F1F', // fluorescent orange: life and the real world
 	cold: '#2B3AC9', // ultramarine: only the screen-world memory
-	lime: '#C6FF3D', // TokTic's own ink, only 2:23–2:38 and the 3:25 receipt
+	lime: '#C6FF3D', // TokTic's own ink: its parts in the 1:24.8–1:32.2 hand-over, the phone 2:23–2:38 and the 3:25 stub
 };
 
 export const ANTON = "'Anton', 'Inter', sans-serif"; // condensed wood-type caps
