@@ -1,11 +1,6 @@
 import {registerRoot} from 'remotion';
-import {F} from '../../full/cues';
-import {Receipt, TearOff} from '../s_back';
+import {SECTIONS} from '../Print';
 import {devRoot} from './root';
 
-registerRoot(
-	devRoot([
-		{from: F.beep1, to: F.alive, C: Receipt, name: 'receipt'},
-		{from: F.alive, to: F.drop3, C: TearOff, name: 'tear-off'},
-	]),
-);
+// The receipt and the tear-off, with the strips before and the flip after. Same times and vertical cameras as Print.tsx.
+registerRoot(devRoot(SECTIONS.filter((s) => ['strips', 'receipt', 'tear-off', 'flip and stack'].includes(s.name))));

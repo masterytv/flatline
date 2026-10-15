@@ -6,7 +6,7 @@ import {BEATS, bt, lastBeatIndex} from '../timing';
 import {INK, MONO} from './ink';
 import {Sketch} from './kit';
 import {PaperFill} from './Press';
-import {FRAME0, Frame, STAGE, StageProvider} from './stage';
+import {FRAME0, Frame, STAGE, StageProvider, VH, VW} from './stage';
 import {FlipStack, InkBattery, V as VBattery} from './s_battery';
 import {Join, Couch, V as VCouch} from './s_couch';
 import {DancingWord, FirstDance, ReversePull, V as VDancing} from './s_dancing';
@@ -64,9 +64,6 @@ const NAMES: Record<string, string> = {
 	macros: 'Macros', still: 'R9Pull', 'dancing and the camera roll': 'Explosion', dawn: 'Dawn', postcards: 'Postcard', 'living line': 'LivingLine', 'end card': 'EndCard',
 };
 export const SECTIONS: Sec[] = BASE.map((s) => ({...s, ...VALL[NAMES[s.name]]}));
-
-const VW = 1080;
-const VH = 1920;
 
 /** 9:16: the section renders on its 16:9 stage, seen through its reframing camera; newsprint fills the rest. */
 const Vertical: React.FC<{t: number; sec: Sec | undefined; C: React.FC<{t: number}>}> = ({t, sec, C}) => {

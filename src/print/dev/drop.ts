@@ -1,11 +1,6 @@
 import {registerRoot} from 'remotion';
-import {F} from '../../full/cues';
-import {Heart, Progs} from '../s_drop';
+import {SECTIONS} from '../Print';
 import {devRoot} from './root';
 
-registerRoot(
-	devRoot([
-		{from: F.flatline2, to: F.heart, C: Progs, name: 'progs'},
-		{from: F.heart, to: F.dancing, C: Heart, name: 'heart'},
-	]),
-);
+// Progs and Heart, with the hand-over before and DANCING after to check the hand-offs. Same times and vertical cameras as Print.tsx.
+registerRoot(devRoot(SECTIONS.filter((s) => ['drop 1 hand-over', 'progs', 'heart', 'DANCING'].includes(s.name))));

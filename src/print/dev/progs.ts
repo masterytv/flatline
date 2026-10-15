@@ -1,6 +1,6 @@
 import {registerRoot} from 'remotion';
-import {F} from '../../full/cues';
-import {Progs} from '../s_drop';
+import {SECTIONS} from '../Print';
 import {devRoot} from './root';
 
-registerRoot(devRoot([{from: F.flatline2, to: F.heart, C: Progs, name: 'progs'}]));
+// Progs on its own. Same times and vertical cameras as Print.tsx.
+registerRoot(devRoot(SECTIONS.filter((s) => ['progs'].includes(s.name))));
