@@ -49,6 +49,9 @@ export const KEEP_BOX = {w: KEEP.w + 2 * KB, h: KEEP.h + KB + KFOOT};
  * Dawn (s_outro.tsx) renders it too, so Dawn's vertical camera should be SEAM until F.dawn + EXIT.
  */
 export const KEEP_V = {cx: 960, cy: 540 + (1000 - 960) / K_FILL, s: 0.61, rot: -1.6};
+/** 9:16: the caption's extra inset along the strip (print px): the paper bleeds off the left of the frame at Explosion's
+ *  push-ins, and this keeps '3:17 am, everyone' at frame x >= ~95 there (~150 on SEAM). */
+const KCAP_IN_V = 64;
 
 export const keepPose = (t: number, vertical = false) => {
 	const k = easeOut((t - LAND + LEAD) / SLIDE); // already sliding in on the beat's own frame
@@ -144,7 +147,8 @@ export const KeepsakePrint: React.FC<{t: number}> = ({t}) => {
 					boxShadow: `${5 + 30 * q.air}px ${10 + 50 * q.air}px ${16 + 60 * q.air}px rgba(45,30,15,${0.32 + 0.12 * q.air})`,
 				}}
 			>
-				<div style={{position: 'absolute', left: KB + 4, top: KB + KEEP.h + 10, fontFamily: SERIF, fontStyle: 'italic', fontSize: 38, lineHeight: 1, color: INK.key, opacity: 0.9, whiteSpace: 'nowrap'}}>
+				{/* 9:16: inset along the strip, so it stays clear of the frame's left edge while Explosion's camera pushes in (k 2.6-2.75) */}
+				<div style={{position: 'absolute', left: KB + 4 + (vertical ? KCAP_IN_V : 0), top: KB + KEEP.h + 10, fontFamily: SERIF, fontStyle: 'italic', fontSize: 38, lineHeight: 1, color: INK.key, opacity: 0.9, whiteSpace: 'nowrap'}}>
 					3:17 am, everyone
 				</div>
 			</div>

@@ -538,9 +538,9 @@ const Table: React.FC<{at: TableAt}> = ({at: c}) => (
 		/>
 	</div>
 );
-// Postcards: every view lies in x 377-1513, y -241-1815 (P53's first frame to the pull back); 1.03 covers it at about
-// the stage paper's own grain.
-const POST_TABLE: TableAt = {cx: 945, cy: 787, s: 1.03};
+// Postcards: every view lies in x 377-1513, y -310-1716 (the pull back's top to the stub's close-ups); 1.03 covers it
+// (x 352-1538, y -352-1758) at about the stage paper's own grain.
+const POST_TABLE: TableAt = {cx: 945, cy: 703, s: 1.03};
 // The living line and the end card: the tracking camera, the release and the end card see x 117-2017, y -1356-1844.
 // At 1.67 the grain on the end card (k 0.6) is the 16:9 paper's.
 const LINE_TABLE: TableAt = {cx: 1067, cy: 244, s: 1.67};
@@ -551,8 +551,11 @@ const SEAM: Frame = {k: K_FILL, x: 960, y: 540};
 // Dawn. The sheet is 2000 x 1116 on the stage (u 0 at x -40, v 0 at y -18). Each photo's cut stays a cut; the key
 // plate's off-beat pull gets a camera move of its own, so the phone changes on every beat while the fountain rises.
 const DAWN_V = vtrack([
-	// 201.921 P50 at the seam (Jess, Kai and Dev on the bench) while the keepsake slides off to the left...
+	// 201.921 P50 at the seam (Jess, Kai and Dev on the bench) while the keepsake slides off to the left, and the camera
+	// pushes in on the off-eighth (202.171) so the backs and the blanket fill the frame: Jess and Kai whole, Maya's hair
+	// at the left edge, the horizon in the top quarter (u 0.35-0.59, v 0.2-0.98)...
 	[F.dawn, SEAM],
+	[F.dawn + 0.25, bleed(905, 640, 2.2), 0.2],
 	// ...202.420 the camera follows it left and lands on Maya's head on Jess's shoulder (u 0.22-0.49), sky above them
 	[bt(109, 2), bleed(668, 560, 2), 0.24],
 	// 202.931 P51: Maya at the parapet in profile, her face left of centre with the sky ahead of her (u 0.44-0.75)
@@ -596,11 +599,16 @@ const onStub = (lx: number, ly: number): [number, number] => {
 };
 const COUNT_AT = onStub(220, 336); // the middle of the minutes
 const ZERO_AT = onStub(220, 425); // the '0', MIN and the battery
-// the whole pile, both cards and the stub, with the cards' left edge clear of the frame's (x 60)
-const PILE: Frame = at(0.95, 945, 804);
+// P53 while it lies alone (its `first` pose): the stack of phones with the mug behind it (u 0.5, v 0.55 on the still)
+const P53_ALONE: Card = {...CARDS_V[0], cx: CARDS_V[0].first![0], cy: CARDS_V[0].first![1], rot: CARDS_V[0].first![2]};
+const STACK53 = onCard(P53_ALONE, 0.5 * IMG.w, 0.55 * IMG.h);
+// the whole pile, both cards and the stub, with the cards' left edge clear of the frame's (x 60); set low in the frame
+// (cards from y 326, the stub's last line at y 1613) so the heavy cards don't float at the top over bare paper
+const PILE: Frame = at(0.95, 945, 700);
 const POST_V = vtrack([
-	// 205.787 P53 dealt alone, close on the stack of phones: the card bleeds off the right, its caption reads on the left
-	[F.screenTime, at(1.22, 960 - 470 + 24, 497, 70, 900)],
+	// 205.787 P53 dealt alone, close on the stack of phones and the mug: the deal whips the card in under the camera
+	// and the dead phones fill the middle of the frame (the caption comes back in the pull back)
+	[F.screenTime, at(2.1, STACK53[0], STACK53[1], 540, 900)],
 	// 206.240 the stub rises in from the foot of the frame: TokTic's own lime header, 214 MIN
 	[STUB_IN, at(1.55, STUB_V.cx, STUB_V.cy, 520, 930)],
 	// 206.692 and 207.145: the count steps down and the camera pushes in on it, twice

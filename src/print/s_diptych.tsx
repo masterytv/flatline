@@ -276,13 +276,30 @@ const ZLV: ZineLayout = {
 		{text: 'started', x: 1000, y: 860},
 	],
 	dancing: {text: 'dancing', x: 1000, y: 978, size: 136},
-	dotX: [GUT + 44, GUT + 104, GUT + 164],
-	dotY: 742 - 20,
-	dotD: 40,
+	// the dots stay on the left page with her: three beats strung on the flat rule under 'stopped', twice the size
+	dotX: [520, 640, 760],
+	dotY: 790,
+	dotD: 80,
 	rule: {x0: 420, y: 790},
 	poise: 100, // on the image's top edge, below the feed's top bar in the 94.4 framing
 	poiseK: 136,
 };
+/** Whether the dots sit on the left page (9:16), where they stay through the page turn. */
+const dotsLeft = (L: ZineLayout) => L.dotX[0] < GUT;
+
+/**
+ * 9:16: FLATLINE as two stacked snipes over P34, FLAT on her face and LINE under it, the letters windows onto her.
+ * LINE lands where the battery's flat rule was (frame y 958 under the slam's camera): the line becomes the word.
+ */
+const FLAT_V = [
+	{text: 'FLAT', cx: 690, cy: 300, rot: -2},
+	// a wedge of paper between the two strips (15 px at the left, 55 at the right); where the crossed bars overlapped,
+	// multiply printed a dark sliver
+	{text: 'LINE', cx: 690, cy: 565, rot: 2.5},
+];
+const FLAT_V_BOX = {w: 520, h: 230, size: 240};
+/** Where the vertical stamp lifts from (the stack's middle). */
+const FLAT_V_LIFT = '690px 432px';
 
 /**
  * The three dots cross from the screen world into real life: the first in cold, the second the two inks
@@ -347,31 +364,35 @@ const spreadScale = (t: number) => (t < Z.slam ? 1 : 1 + 0.05 * (1 - easeOut((t 
 const sp = (S: number, x: number, y: number): [number, number] => [960 + (x - 960) * S, 540 + (y - 540) * S];
 
 /**
- * 9:16, the phone's camera on the zine (frame px per world px; a page fills the phone at 1.92). The spread is seen
- * whole only where it is the point: the slam with FLATLINE across it, and before/after side by side into the page
- * turn. Between, the camera cuts from page to page on the beats: her profile over 'my heart / stopped', the rule
- * running to the fold, a macro on the fold as the dots step over it, the blank right page with the blade waiting,
- * the orange pull, her face as the black blade drops, the whole 'after' page for the black pull and 'dancing'; then
- * after the turn the five walking home in pairs, one per beat, ending on Maya.
+ * 9:16, the phone's camera on the zine (frame px per world px; a page fills the phone at 1.92). It opens on the left
+ * page, FLAT / LINE stamped over her (LINE where the battery's rule was), punches in on the echo and lifts the stamp
+ * off into her profile over 'my heart / stopped'. The rule runs to the fold, the dots step onto it under 'stopped'
+ * with her face held above (the heart's stop stays on her), then a cut to the right page with the orange blade
+ * already pulling P35, her face as the black blade drops, the whole 'after' page for the black pull and 'dancing'. The
+ * spread is seen once, before/after side by side at 177.8, pushing in as the page turns; then the five walking home
+ * full bleed: Sam on Dev's back, Maya, Jess and Kai under the black pull, Maya closer into the cut.
  */
 const ZINE_MOVES_V: Move[] = [
-	{t: -1e9, to: ph(960, 610, 0.6, -3), dur: 1}, // the spread slams open on the table, thrown a little askew, FLATLINE across it
-	{t: bt(93, 2), to: ph(1020, 600, 0.66), dur: 0.06}, // the orange echo: a punch in, square, the word as wide as the phone
-	{t: Z.caption, to: ph(690, 470, 2), dur: 0.02}, // cut: the left page, her profile over 'my heart / stopped'
+	// the left page fills the phone, thrown a little askew: FLAT / LINE stamped over her, LINE level on the battery's rule
+	{t: -1e9, to: ph(690, 566, 1.92, -3), dur: 1},
+	{t: bt(93, 2), to: ph(710, 450, 2.02), dur: 0.06}, // the orange echo: a punch in, square, on the stack
+	{t: Z.caption, to: ph(690, 470, 2), dur: 0.15}, // the stamp lifts off: her profile over 'my heart / stopped'
 	// the rule draws to the fold and the camera leans after it, no further than keeps 'my heart' whole (x 78-878)
 	{t: Z.rule, to: ph(722, 520, 2.1), dur: 0.3},
-	{t: Z.dots[0], to: ph(1078, 740, 3.4), dur: 0.02}, // cut: a macro on the fold, the rule's end, the first dot
-	{t: Z.dots[1], to: ph(1090, 738, 3.5), dur: 0.12}, // stepping right with the dots
-	{t: Z.dots[2], to: ph(1100, 736, 3.6), dur: 0.12},
-	{t: bt(94, 4), to: ph(1220, 440, 2), dur: 0.02}, // cut: the blank right page, the orange blade dropping onto it
-	{t: Z.orange, to: ph(1225, 545, 1.85), dur: 0.14}, // the pull: down with the blade onto P35 and 'and I / started'
+	// the dots step onto the rule under 'stopped', one per beat, her face held above them: a cut out, then two pushes
+	{t: Z.dots[0], to: ph(700, 570, 1.85), dur: 0.02},
+	{t: Z.dots[1], to: ph(705, 570, 1.95), dur: 0.12},
+	{t: Z.dots[2], to: ph(710, 570, 2.05), dur: 0.12},
+	{t: bt(94, 4), to: ph(712, 556, 2.15), dur: 0.12}, // a last push on her eye; the heart is still stopped
+	{t: Z.orange, to: ph(1225, 545, 1.85), dur: 0.02}, // cut: the right page, the orange blade already pulling P35 down
 	{t: bt(95, 2), to: ph(1250, 350, 3.2), dur: 0.12}, // a push on her face, the black blade waiting above it
 	{t: Z.black, to: ph(1219, 622, 1.7), dur: 0.02}, // cut: the whole 'after' page for the black pull and 'dancing' (its descender above y 1620)
-	{t: bt(95, 4), to: ph(960, 610, 0.57), dur: 0.2}, // pull back: before and after, side by side
-	{t: Z.turn, to: ph(960, 605, 0.6), dur: 0.12}, // the turn lands: P36 across the spread
-	{t: bt(96, 2), to: ph(690, 520, 1.92), dur: 0.02}, // cut: Jess and Kai, the black blade dropping across the spread
-	{t: Z.black2, to: ph(1188, 540, 1.92), dur: 0.02}, // cut: Sam laughing on Dev's back as the blade passes
-	{t: bt(96, 4), to: ph(1550, 440, 2.2), dur: 0.02}, // cut: Maya at the right, into the cut to the wall
+	{t: bt(95, 4), to: ph(985, 560, 0.9), dur: 0.2}, // pull back: before and after side by side, the photos the phone's width
+	{t: Z.turn - TURN, to: ph(960, 540, 1.3), dur: 0.18}, // in with the turning page as it sweeps over the fold
+	{t: Z.turn, to: ph(1188, 540, 1.92), dur: 0.02}, // the turn lands, full bleed: Sam on Dev's back, Maya's hand reaching in
+	{t: bt(96, 2), to: ph(1550, 470, 1.92), dur: 0.02}, // cut: Maya, the black blade dropping above her
+	{t: Z.black2, to: ph(690, 520, 1.92), dur: 0.02}, // cut: Jess and Kai as the black pull passes down them
+	{t: bt(96, 4), to: ph(1550, 440, 2.2), dur: 0.02}, // cut: Maya again, closer, into the cut to the wall
 	{t: bt(96, 4) + 0.06, to: ph(1556, 430, 2.32), dur: 0.36}, // leaning in after her, into the cut
 ];
 
@@ -467,7 +488,7 @@ const RightPageFace: React.FC<{d: Record<string, Density>; t: number; res: numbe
 			<CropMarks x={R.x - GUT} y={R.y - SPREAD.y} w={R.w} h={R.h} gap={10} len={26} />
 			<Slug x={R.x - GUT} y={22} text="13 · AFTER · 2:52 AM · THE WALK HOME" size={14} />
 			<WorldSvg box={[0, 0, SPREAD.w / 2, SPREAD.h]}>
-				<Dots L={L} x0={0} y={L.dotY - SPREAD.y} n={3} />
+				{!dotsLeft(L) && <Dots L={L} x0={0} y={L.dotY - SPREAD.y} n={3} />}
 				{L.started.map((l) => (
 					<text key={l.text} x={l.x - GUT} y={l.y - SPREAD.y} fontFamily={SERIF} fontStyle="italic" fontSize={L.cap} fill={INK.heat}>
 						{l.text}
@@ -610,8 +631,8 @@ export const Diptych: React.FC<{t: number}> = ({t}) => {
 									</g>
 								</WorldSvg>
 							)}
-							{/* the dots: the sentence steps over the fold onto the blank page, one per beat */}
-							{!turning && t >= Z.dots[0] && (
+							{/* the dots: the sentence steps over the fold onto the blank page, one per beat (9:16: on the left page's rule) */}
+							{(!turning || dotsLeft(L)) && t >= Z.dots[0] && (
 								<WorldSvg box={[0, 0, 1920, 1080]} style={inked(300, 40, 0, true)}>
 									<Dots L={L} x0={GUT} y={L.dotY} n={Z.dots.filter((b) => t >= b).length} s={(i) => stamp(t, Z.dots[i]).s * (1 + 0.25 * Math.exp(-(t - Z.dots[i]) / 0.05))} />
 								</WorldSvg>
@@ -650,12 +671,24 @@ export const Diptych: React.FC<{t: number}> = ({t}) => {
 					{turned && <Slug x={SPREAD.x + 30} y={SPREAD.y + SPREAD.h - 34} text="14–15 · ALL FIVE · 2:58 AM · O 15° K 45°" size={14} color={INK.paper} />}
 					<Fold />
 					{/* FLATLINE: the shout, stamped across both pages; on the left its letters are windows onto her */}
-					{flat.on && lift < 1 && (
+					{flat.on && lift < 1 && !vertical && (
 						<div style={{position: 'absolute', left: 0, top: 0, opacity: 1 - lift, transform: `translate(0px, ${-46 * lift}px) scale(${1 + 0.12 * lift})`, transformOrigin: '960px 470px'}}>
 							{echo > 0.03 && (
 								<Snipe id="zine-flat-echo" cx={960} cy={466} w={1600} h={360} rot={-2} text="FLATLINE" size={380} spacing={0.03} bar={INK.heat} s={1.012} dx={16 * echo} dy={-11 * echo} />
 							)}
 							<Snipe id="zine-flat" cx={960} cy={466} w={1600} h={360} rot={-2} text="FLATLINE" size={380} spacing={0.03} bar={INK.key} s={flat.s} />
+						</div>
+					)}
+					{/* 9:16: FLAT / LINE, two snipes stacked over her on the left page */}
+					{flat.on && lift < 1 && vertical && (
+						<div style={{position: 'absolute', left: 0, top: 0, opacity: 1 - lift, transform: `translate(0px, ${-46 * lift}px) scale(${1 + 0.12 * lift})`, transformOrigin: FLAT_V_LIFT}}>
+							{echo > 0.03 &&
+								FLAT_V.map((l) => (
+									<Snipe key={l.text} id={`zine-v-echo-${l.text}`} cx={l.cx} cy={l.cy} w={FLAT_V_BOX.w} h={FLAT_V_BOX.h} rot={l.rot} text={l.text} size={FLAT_V_BOX.size} spacing={0.03} bar={INK.heat} s={1.012} dx={12 * echo} dy={-8 * echo} />
+								))}
+							{FLAT_V.map((l) => (
+								<Snipe key={l.text} id={`zine-v-${l.text}`} cx={l.cx} cy={l.cy} w={FLAT_V_BOX.w} h={FLAT_V_BOX.h} rot={l.rot} text={l.text} size={FLAT_V_BOX.size} spacing={0.03} bar={INK.key} s={flat.s} />
+							))}
 						</div>
 					)}
 				</div>
@@ -781,6 +814,13 @@ const MH = {x: 880, w: 836, base1: 352};
 const MH_S1 = MH.w / 3.695;
 const MH_S2 = MH.w / 3.192;
 const MH_BASE2 = MH.base1 + 26 + MH_S2 * 0.859;
+/**
+ * 9:16: the heart block hangs on the wall under Jess's poster (P38's paper ends at y 990), right-aligned to her print,
+ * so the phone holds poster over type: the type first under the bare patch, then P38 slapped up above it. Its right
+ * edge (x 2346) stays left of Kai's frame (x 2360 on).
+ */
+const MHV = {x: 1510, w: 836, base1: 1234};
+const MHV_BASE2 = MHV.base1 + 26 + MH_S2 * 0.859;
 
 const SNIPE_Y = 800;
 
@@ -811,21 +851,22 @@ const HOIST_MOVES: Move[] = [
 /**
  * 9:16, the phone's camera on the wall (frame px per world px). Every lyric is framed whole: FLATLINE across Dev's
  * poster, MY HEART / STOPPED as wide as the phone allows, AND I / STARTED stacked over Kai, DAN / CING stacked on Maya.
- * Between them it punches in on the faces on the off beats (Dev, Jess), takes the kick wide (the heart block with
- * Jess beside it), and from 99.2 follows Maya's poster up the wall one pull per beat, the camera lagging so she
- * climbs the frame, then pushes in through the swell, cuts to her face and snaps out to the whole poster on the drop.
+ * The heart block hangs under Jess's poster: it stamps under the pasted patch where she goes, she is slapped up above
+ * it, and the kick holds the stacked pair. Between them it punches in on the faces on the off beats (Dev, Jess), and
+ * from 99.2 follows Maya's poster up the wall one pull per beat, the camera lagging so she climbs the frame, then
+ * pushes in through the swell, cuts to her face and snaps out to the whole poster on the drop.
  */
 const HOIST_MOVES_V: Move[] = [
-	{t: -1e9, to: ph(380, 580, 1.05), dur: 1}, // Dev's poster, the FLATLINE snipe whole across it
+	{t: -1e9, to: ph(380, 600, 1.45), dur: 1}, // Dev's poster filling the width, the FLATLINE snipe whole across it
 	{t: bt(97, 2), to: ph(300, 365, 2.4), dur: 0.04}, // punch in: his face, head back, eyes shut
-	// cut: MY HEART / STOPPED, the phone's width, centred on the safe area (x 74-927; 1.05 put the M at 52)
-	{t: H.heart, to: ph(1337, 418, 1.02), dur: 0.03},
-	{t: bt(97, 4), to: ph(1337, 400, 1.02, -1), dur: 0.3}, // STOPPED's heat beats once more: a lean
-	{t: H.p38, to: ph(2070, 589, 1.55), dur: 0.08}, // whip right: Jess's poster
+	// cut: MY HEART / STOPPED low in the frame, centred on the safe area (x 61-939), under the bare patch P38 will cover
+	{t: H.heart, to: ph(1966, 880, 1.05), dur: 0.03},
+	{t: bt(97, 4), to: ph(1966, 870, 1.05, -1), dur: 0.3}, // STOPPED's heat beats once more: a lean
+	{t: H.p38, to: ph(1992, 820, 0.99), dur: 0.08}, // P38 slapped up above the type: out a touch, poster over type
 	{t: bt(98, 2), to: ph(1960, 400, 2.3), dur: 0.06}, // punch in: her face and raised hand
-	{t: H.kick, to: ph(1500, 450, 0.75), dur: 0.08}, // the register kick, wide: the heart block, Jess beside it
-	{t: bt(98, 4), to: ph(1337, 400, 1.02), dur: 0.1}, // in on the heart block: it beats again, in heat
-	{t: bt(98, 4) + 0.12, to: ph(1337, 385, 1.02), dur: 0.33},
+	{t: H.kick, to: ph(1992, 820, 0.99), dur: 0.08}, // the register kick: the stacked pair, poster over type, y 223-1618
+	{t: bt(98, 4), to: ph(1966, 1300, 1.05), dur: 0.1}, // in on the heart block: it beats again, in heat
+	{t: bt(98, 4) + 0.12, to: ph(1970, 1288, 1.05), dur: 0.33},
 	{t: H.started, to: ph(2720, 640, 1.5), dur: 0.03}, // cut: Kai, AND I / STARTED
 	// Maya's poster hoisted up the wall, a pull per beat; the camera follows a little behind, so she climbs the frame
 	{t: H.steps[0], to: ph(3560, 1050, 1.4), dur: 0.03},
@@ -852,7 +893,8 @@ const hoistCam = (t: number, vertical = false): Cam => {
  * AND I STARTED is two paper strips stacked over Kai, DANCING two orange strips stacked on Maya's poster below her
  * face (offsets from her poster's centre), each line at least 180 px tall on the phone.
  */
-const SNIPE_V = {cx: 340, cy: 880};
+/** Narrower than 16:9's (900 x 250, size 232), so the opening can frame Dev's poster at 1.45 with the word whole. */
+const SNIPE_V = {cx: 340, cy: 880, w: 620, h: 180, size: 160};
 const STARTED_V = [
 	{text: 'AND I', cx: 2610, cy: 760, w: 430, h: 200, rot: -2.5},
 	{text: 'STARTED', cx: 2700, cy: 950, w: 640, h: 200, rot: 2},
@@ -926,9 +968,12 @@ const SCRAPS: {x: number; y: number; w: number; h: number; r: number; word?: str
 	{x: 3070, y: 990, w: 420, h: 150, r: -2},
 	{x: 3990, y: 300, w: 300, h: 640, r: 3, word: 'JUNE'},
 ];
-const WallMarks: React.FC = () => (
+/** 9:16 moves the pale scrap that sat under the heart block in 16:9 off to the left, out of every phone frame. */
+const SCRAP_V_X: Record<number, number> = {1: 1040};
+const WallMarks: React.FC<{vertical?: boolean}> = ({vertical = false}) => (
 	<>
-		{SCRAPS.map(({x, y, w, h, r, word}, i) => {
+		{SCRAPS.map(({x: x16, y, w, h, r, word}, i) => {
+			const x = vertical ? (SCRAP_V_X[i] ?? x16) : x16;
 			const pts: string[] = [];
 			const n = 9;
 			for (let k = 0; k <= n; k++) pts.push(`${((k / n) * w).toFixed(0)},${(hash2(k, i, 1) * 30).toFixed(0)}`);
@@ -973,6 +1018,61 @@ const WallMarks: React.FC = () => (
 		))}
 	</>
 );
+
+/**
+ * 9:16: wheatpaste brushed onto the wall where P38 goes, so the bare patch over MY HEART / STOPPED (181.0, a beat
+ * before she is slapped up) reads as a wall made ready: broad wet strokes, a sheen, a couple of drips. Once P38 is up
+ * it shows only as a wet margin round her paper.
+ */
+const PASTE = {cx: 2060, cy: 533, w: 668, h: 950, rot: 1.1};
+const PastePatch: React.FC = () => {
+	const {w, h} = PASTE;
+	// the damp patch: a ragged rectangle, a shade darker than the dry wall
+	const pts: string[] = [];
+	const n = 12;
+	for (let k = 0; k <= n; k++) pts.push(`${((k / n) * w).toFixed(0)},${(hash2(k, 1, 71) * 16).toFixed(0)}`);
+	for (let k = 0; k <= n; k++) pts.push(`${(w - hash2(k, 2, 71) * 16).toFixed(0)},${((k / n) * h).toFixed(0)}`);
+	for (let k = n; k >= 0; k--) pts.push(`${((k / n) * w).toFixed(0)},${(h - hash2(k, 3, 71) * 16).toFixed(0)}`);
+	for (let k = n; k >= 0; k--) pts.push(`${(hash2(k, 4, 71) * 16).toFixed(0)},${((k / n) * h).toFixed(0)}`);
+	// the brush: long criss-crossed sweeps, the way paste goes on, faint inside the damp
+	const sweeps: [number, number, number, number][] = [
+		[40, 120, w - 30, 380],
+		[30, 520, w - 50, 230],
+		[50, 640, w - 40, 860],
+		[20, 900, w - 60, 610],
+	];
+	return (
+		<svg
+			viewBox={`0 0 ${w} ${h}`}
+			style={{position: 'absolute', left: PASTE.cx - w / 2, top: PASTE.cy - h / 2, width: w, height: h, overflow: 'visible', transform: `rotate(${PASTE.rot}deg)`}}
+		>
+			<defs>
+				<clipPath id="paste-v">
+					<polygon points={pts.join(' ')} />
+				</clipPath>
+			</defs>
+			<g style={{mixBlendMode: 'multiply'}}>
+				<polygon points={pts.join(' ')} fill="rgba(125,98,58,0.07)" />
+				<g clipPath="url(#paste-v)">
+					{sweeps.map(([x0, y0, x1, y1], i) => (
+						<path key={i} d={`M ${x0} ${y0} L ${x1} ${y1}`} stroke="rgba(125,98,58,0.035)" strokeWidth={150} strokeLinecap="round" fill="none" />
+					))}
+				</g>
+				{/* drips run from the bottom edge toward the type */}
+				{[
+					[132, 34],
+					[402, 22],
+					[566, 44],
+				].map(([x, len], i) => (
+					<path key={i} d={`M ${x} ${h - 8} L ${x} ${h - 8 + len}`} stroke="rgba(125,98,58,0.1)" strokeWidth={7} strokeLinecap="round" fill="none" />
+				))}
+			</g>
+			{/* the wet sheen along one sweep */}
+			<path d={`M 90 ${h * 0.24} L ${w - 110} ${h * 0.31}`} stroke="rgba(255,253,245,0.13)" strokeWidth={46} strokeLinecap="round" fill="none" clipPath="url(#paste-v)" />
+			<path d={`M 150 ${h * 0.25} L ${w - 180} ${h * 0.3}`} stroke="rgba(255,253,245,0.12)" strokeWidth={12} strokeLinecap="round" fill="none" clipPath="url(#paste-v)" />
+		</svg>
+	);
+};
 
 /** A poster's paper (DOM), under its print. */
 const PosterPaper: React.FC<{cx: number; cy: number; w: number; h: number; rot: number; s: number; shadow: string; label: string; wet: number; children?: React.ReactNode}> = ({
@@ -1088,12 +1188,17 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 	const dcy = hy + Math.sin(rot40) * dOff + Math.cos(rot40) * dLocal;
 	// 9:16: DAN / CING, each strip riding on her poster the same way
 	const onHero = (ox: number, oy: number): [number, number] => [HERO.cx + Math.cos(rot40) * ox - Math.sin(rot40) * oy, hy + Math.sin(rot40) * ox + Math.cos(rot40) * oy];
+	// the heart block: between Dev and Jess in 16:9, under Jess's poster in 9:16
+	const mh = vertical ? MHV : MH;
+	const mhBase2 = vertical ? MHV_BASE2 : MH_BASE2;
 
 	return (
 		<AbsoluteFill style={{background: INK.paper}}>
 			<CamLayer cam={cam}>
-				<Paper x={-1400} y={-900} w={6400} h={2900} />
-				<WallMarks />
+				{/* 9:16: the wall runs further down, under the heart block's frames */}
+				{vertical ? <Paper x={-1400} y={-900} w={6400} h={3600} /> : <Paper x={-1400} y={-900} w={6400} h={2900} />}
+				<WallMarks vertical={vertical} />
+				{vertical && <PastePatch />}
 				{live.map((p, n) => {
 					const sl = slap(t, p.t0);
 					return (
@@ -1116,26 +1221,26 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 			<CamLayer cam={cam}>
 				{/* MY HEART / STOPPED, stamped straight onto the wall */}
 				{heartSt.on && (
-					<WorldSvg box={[780, 0, 1100, 800]} style={inked(900, 9, 4, true)}>
-						<g transform={about(MH.x + MH.w / 2, MH.base1, heartSt.s * (1 + 0.035 * thump))}>
-							<text x={MH.x} y={MH.base1} fontFamily="Anton" fontSize={MH_S1} fill={INK.key}>
+					<WorldSvg box={vertical ? [MHV.x - 100, MHV.base1 - 352, 1100, 800] : [780, 0, 1100, 800]} style={inked(900, 9, 4, true)}>
+						<g transform={about(mh.x + mh.w / 2, mh.base1, heartSt.s * (1 + 0.035 * thump))}>
+							<text x={mh.x} y={mh.base1} fontFamily="Anton" fontSize={MH_S1} fill={INK.key}>
 								MY HEART
 							</text>
 							{restart && (
 								<g style={{mixBlendMode: 'multiply'}}>
-									<text x={MH.x + 13 + 9 * thump} y={MH.base1 - 8 - 6 * thump} fontFamily="Anton" fontSize={MH_S1} fill={INK.heat}>
+									<text x={mh.x + 13 + 9 * thump} y={mh.base1 - 8 - 6 * thump} fontFamily="Anton" fontSize={MH_S1} fill={INK.heat}>
 										MY HEART
 									</text>
 								</g>
 							)}
 						</g>
-						<g transform={about(MH.x, MH_BASE2, heartSt.s)}>
-							<text x={MH.x} y={MH_BASE2} fontFamily="Anton" fontSize={MH_S2} fill={INK.key}>
+						<g transform={about(mh.x, mhBase2, heartSt.s)}>
+							<text x={mh.x} y={mhBase2} fontFamily="Anton" fontSize={MH_S2} fill={INK.key}>
 								STOPPED
 							</text>
 							{ghost > 0.03 && (
-								<g transform={about(MH.x + MH.w / 2, MH_BASE2, 1 + 0.035 * ghost)} style={{mixBlendMode: 'multiply'}}>
-									<text x={MH.x + 16 * ghost} y={MH_BASE2 - 10 * ghost} fontFamily="Anton" fontSize={MH_S2} fill={INK.heat}>
+								<g transform={about(mh.x + mh.w / 2, mhBase2, 1 + 0.035 * ghost)} style={{mixBlendMode: 'multiply'}}>
+									<text x={mh.x + 16 * ghost} y={mhBase2 - 10 * ghost} fontFamily="Anton" fontSize={MH_S2} fill={INK.heat}>
 										STOPPED
 									</text>
 								</g>
@@ -1144,7 +1249,22 @@ export const Hoist: React.FC<{t: number}> = ({t}) => {
 					</WorldSvg>
 				)}
 				{/* FLATLINE snipe across Dev, black with paper letters */}
-				{flatSt.on && <Snipe id="hoist-flat" cx={vertical ? SNIPE_V.cx : 380} cy={vertical ? SNIPE_V.cy : SNIPE_Y} w={900} h={250} rot={-3.5} text="FLATLINE" size={232} spacing={0.035} bar={INK.key} paperLetters s={flatSt.s} />}
+				{flatSt.on && (
+					<Snipe
+						id="hoist-flat"
+						cx={vertical ? SNIPE_V.cx : 380}
+						cy={vertical ? SNIPE_V.cy : SNIPE_Y}
+						w={vertical ? SNIPE_V.w : 900}
+						h={vertical ? SNIPE_V.h : 250}
+						rot={-3.5}
+						text="FLATLINE"
+						size={vertical ? SNIPE_V.size : 232}
+						spacing={0.035}
+						bar={INK.key}
+						paperLetters
+						s={flatSt.s}
+					/>
+				)}
 				{/* AND I STARTED snipe across Kai: a paper strip printed in orange (9:16: two strips, stacked) */}
 				{startedSt.on && !vertical && <Snipe id="hoist-started" cx={2610} cy={SNIPE_Y + 6} w={830} h={190} rot={2.2} text="AND I STARTED" size={136} spacing={0.03} ink={INK.heat} s={startedSt.s} />}
 				{startedSt.on &&

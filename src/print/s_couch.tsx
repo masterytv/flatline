@@ -9,7 +9,7 @@ import {bbox, FRIENDS, Friend, inPoly, P11_SPIN, P12_MAYA, P7_FACES, P7_HAND, P7
 import {Cam, Plate, plateDots, Sheet, sheetMatrix} from './press';
 import {CamLayer, Paper, Press} from './Press';
 import {ReverseSheetV} from './s_dancing';
-import {bleed, Frame, K_FILL, K_FIT, useStage, VH, VMap, vtrack, VW} from './stage';
+import {bleed, Frame, K_FILL, useStage, VH, VMap, vtrack, VW} from './stage';
 
 // 1:56.1-2:07.1, drop 2 (bars 62-67).
 // Couch (62.1-64.4): the black FLATLINE sheet peels off P7, printed cold (the screen world): four friends on the sofa,
@@ -502,51 +502,107 @@ const CouchScene: React.FC<{t: number; cam: Cam; map: Density; vertical?: boolea
 	);
 };
 
-/**
- * The sheet buckles: two halves turning about the centre crease, which rises toward us. With `lift` (9:16, where the
- * whole sheet is seen lying on the newsprint) each half casts its own shadow on the newsprint, so the sheet itself
- * buckles rather than a print on a flat card.
- */
-const Fold: React.FC<{a: number; render: () => React.ReactNode; lift?: boolean}> = ({a, render, lift}) => (
+/** The sheet buckles: two halves turning about the centre crease, which rises toward us. */
+const Fold: React.FC<{a: number; render: () => React.ReactNode}> = ({a, render}) => (
 	<AbsoluteFill style={{perspective: 1500, perspectiveOrigin: '50% 50%'}}>
-		{(['l', 'r'] as const).map((side) => {
-			const half = (
+		{(['l', 'r'] as const).map((side) => (
+			<div
+				key={side}
+				style={{
+					position: 'absolute',
+					inset: 0,
+					clipPath: side === 'l' ? 'inset(0 50% 0 0)' : 'inset(0 0 0 50%)',
+					transformOrigin: '960px 540px',
+					transform: `rotateY(${side === 'l' ? -a : a}deg)`,
+					isolation: 'isolate',
+					background: INK.paper,
+				}}
+			>
+				{render()}
 				<div
-					key={side}
 					style={{
 						position: 'absolute',
 						inset: 0,
-						clipPath: side === 'l' ? 'inset(0 50% 0 0)' : 'inset(0 0 0 50%)',
-						transformOrigin: '960px 540px',
-						transform: `rotateY(${side === 'l' ? -a : a}deg)`,
-						isolation: 'isolate',
-						background: INK.paper,
+						mixBlendMode: 'multiply',
+						background:
+							side === 'l'
+								? `linear-gradient(90deg, rgba(70,45,20,${(0.1 * a) / 13}) 0%, rgba(70,45,20,0) 50%)`
+								: `linear-gradient(90deg, rgba(70,45,20,0) 50%, rgba(70,45,20,${(0.2 * a) / 13}) 56%, rgba(70,45,20,${(0.1 * a) / 13}) 100%)`,
 					}}
-				>
-					{render()}
+				/>
+			</div>
+		))}
+	</AbsoluteFill>
+);
+
+/**
+ * 9:16, 64.2 (the wide) and 64.4 (the buckle). Four on a sofa is a 607 px band on the phone, faces 45 px tall, so P7 is
+ * cut on its centre crease and laid as two leaves on the newsprint: the Jess+Dev leaf at the top, the Kai+Sam leaf
+ * below it, lying over its foot (Maya's hand goes under it; the wash on 64.3 gives it the whole frame). Each pair is
+ * twice the size the whole sheet could be. On 64.4 each leaf turns about its crease edge as the 16:9 halves turn about
+ * the crease, its outer edge going down and its shadow lengthening. The phone looks through SEAM, so each leaf has its
+ * own rostrum camera (onP7V: the crease's top corner at frame px `crease`, LEAF_M frame px per paper px) and the
+ * press draws it at that scale.
+ */
+const LEAF_M = 1.12;
+const LEAF_MARGIN = {out: 0.045, top: 0.05, foot: 0.08}; // paper round the print: crop marks and register targets
+type LeafSpec = {side: 'l' | 'r'; crease: [number, number]; rot: number};
+const LEAVES: LeafSpec[] = [
+	{side: 'l', crease: [976, 103], rot: -0.7},
+	{side: 'r', crease: [50, 955], rot: 0.6},
+];
+
+const Leaf: React.FC<{leaf: LeafSpec; t: number; a: number; push: number; map: Density}> = ({leaf, t, a, push, map}) => {
+	const cam = beatHit(zoom(onP7V(0.5, 0, LEAF_M, leaf.crease[0], leaf.crease[1], leaf.rot), push), t);
+	const mg = LEAF_MARGIN;
+	const left = leaf.side === 'l';
+	const [ua, ub] = left ? [-mg.out, 0.5] : [0.5, 1 + mg.out];
+	const quad = [
+		[ua, -mg.top],
+		[ub, -mg.top],
+		[ub, 1 + mg.foot],
+		[ua, 1 + mg.foot],
+	].map(([u, v]) => toScreen(cam, onSheet(P7S, u, v)));
+	// the crease: the hinge each leaf turns about
+	const [c0x, c0y] = toScreen(cam, onSheet(P7S, 0.5, -mg.top));
+	const [c1x, c1y] = toScreen(cam, onSheet(P7S, 0.5, 1 + mg.foot));
+	const len = Math.hypot(c1x - c0x, c1y - c0y);
+	const ox = (c0x + c1x) / 2;
+	const oy = (c0y + c1y) / 2;
+	const sx = P7S.cx - P7S.w / 2;
+	const sy = P7S.cy - P7S.h / 2;
+	const sh = (x: number) => `rgba(70,45,20,${((x * a) / 13).toFixed(3)})`;
+	return (
+		<div style={{position: 'absolute', inset: 0, perspective: 1500, perspectiveOrigin: `${ox}px ${oy}px`, filter: `drop-shadow(0 ${10 + a}px ${22 + 2 * a}px rgba(60,40,20,0.32))`}}>
+			<div
+				style={{
+					position: 'absolute',
+					inset: 0,
+					clipPath: `polygon(${quad.map(([x, y]) => `${x.toFixed(1)}px ${y.toFixed(1)}px`).join(', ')})`,
+					transformOrigin: `${ox}px ${oy}px`,
+					transform: `rotate3d(${((c1x - c0x) / len).toFixed(4)}, ${((c1y - c0y) / len).toFixed(4)}, 0, ${left ? -a : a}deg)`,
+					isolation: 'isolate',
+					background: INK.paper,
+				}}
+			>
+				<CouchScene t={t} cam={cam} map={map} vertical />
+				<CamLayer cam={cam}>
 					<div
 						style={{
 							position: 'absolute',
-							inset: 0,
+							left: sx + ua * P7S.w,
+							top: sy - mg.top * P7S.h,
+							width: (ub - ua) * P7S.w,
+							height: (1 + mg.top + mg.foot) * P7S.h,
 							mixBlendMode: 'multiply',
-							background:
-								side === 'l'
-									? `linear-gradient(90deg, rgba(70,45,20,${(0.1 * a) / 13}) 0%, rgba(70,45,20,0) 50%)`
-									: `linear-gradient(90deg, rgba(70,45,20,0) 50%, rgba(70,45,20,${(0.2 * a) / 13}) 56%, rgba(70,45,20,${(0.1 * a) / 13}) 100%)`,
+							background: left ? `linear-gradient(90deg, ${sh(0.1)} 0%, ${sh(0)} 100%)` : `linear-gradient(90deg, ${sh(0)} 0%, ${sh(0.2)} 12%, ${sh(0.1)} 100%)`,
 						}}
 					/>
-				</div>
-			);
-			return lift ? (
-				<div key={side} style={{position: 'absolute', inset: 0, perspective: 1500, perspectiveOrigin: '50% 50%', filter: `drop-shadow(0 ${16 + a}px ${36 + 2 * a}px rgba(60,40,20,0.3))`}}>
-					{half}
-				</div>
-			) : (
-				half
-			);
-		})}
-	</AbsoluteFill>
-);
+				</CamLayer>
+			</div>
+		</div>
+	);
+};
 
 const THUMPS = [bt(61, 2), bt(61, 4)];
 const FROZEN_ECG = ecgPoints(F.couch, 1600, 30, 2.6, (b) => THUMPS.some((x) => Math.abs(x - b) < 1e-3));
@@ -585,11 +641,18 @@ export const Couch: React.FC<{t: number}> = ({t}) => {
 	const cam = beatHit(vertical ? couchCamV(t) : couchCam(t), t);
 	const peel = easeOut((t - F.couch) / 0.3); // it rips up on the downbeat, slowing as it leaves the frame
 	const fold = foldAt(t);
+	// 9:16: the wide and the buckle are the two leaves on the newsprint (the rostrum's 16:9 push and pull scale them about the frame's centre)
+	if (vertical && ((t >= WIDE && t < WASH) || t >= BUCKLE))
+		return (
+			<AbsoluteFill style={{background: INK.paper}}>
+				<Paper x={0} y={0} w={W} h={H} />
+				{d && LEAVES.map((leaf) => <Leaf key={leaf.side} leaf={leaf} t={t} a={fold} push={couchCam(t).s} map={d.P7} />)}
+			</AbsoluteFill>
+		);
 	const scene = () => (d ? <CouchScene t={t} cam={cam} map={d.P7} vertical={vertical} /> : null);
-	const lift = vertical && fold > 0.05;
 	return (
-		<AbsoluteFill style={{background: lift ? 'transparent' : INK.paper}}>
-			{fold > 0.05 ? <Fold a={fold} render={scene} lift={lift} /> : scene()}
+		<AbsoluteFill style={{background: INK.paper}}>
+			{fold > 0.05 ? <Fold a={fold} render={scene} /> : scene()}
 			{peel < 1 && <Peel k={peel} vertical={vertical} />}
 		</AbsoluteFill>
 	);
@@ -695,6 +758,22 @@ const WHIP_DIST_V = 2290;
 const WHIP_POW = 4.5;
 /** The whip's wind-up: the pile kicks back left on 67.4 before it flies off right. */
 const windUp = (k: number) => (k < 0.12 ? 0.6 + 0.4 * easeOut(k / 0.12) : 1 - easeInOut((k - 0.12) / 0.35));
+
+// 9:16: the column fills less of the phone than the pile does of the 16:9 frame, so as it whips off the last four
+// frames before the roof were bare newsprint with a blurred sliver at the right. Instead the column leaves a smear
+// behind it, the long exposure of its own trailing edge: its blurred image again, offset back to the frame's left edge,
+// blurred further and faded toward the paper, darkening the newsprint it has just crossed. Phone frame's left edge on
+// the seam, in stage px, and the column's trailing edge (its prints' left corners) at rest on the whip beat.
+const WIN_L = 960 - VW / 2 / K_FILL;
+const columnLeft = (cam: Cam, t: number) => Math.min(...SHOTS.flatMap((s) => [0, 1].map((v) => toScreen(cam, onSheet(poseOf(s, t, true), 0, v))[0])));
+const COLUMN_REST = columnLeft(zoom(PILE_CAM_V, 1.03), J.whip);
+const SMEAR_FADE = 0.9;
+const PAPER_RGB = [0xef, 0xe7, 0xd6].map((c) => c / 255); // INK.paper
+/** How far back the smear reaches (stage px), 0 until the column starts to leave its place. */
+const smearAt = (cam: Cam, t: number, blur: number) => {
+	const left = columnLeft(cam, t);
+	return Math.max(0, left - WIN_L + 0.5 * blur) * clamp01((left - COLUMN_REST) / 30);
+};
 
 const joinCam = (t: number, vertical = false): Cam => {
 	const k = (a: number, b: number) => clamp01((t - a) / (b - a));
@@ -865,6 +944,7 @@ export const Join: React.FC<{t: number}> = ({t}) => {
 	const pileS = (vertical ? PILE_CAM_V : PILE_CAM).s;
 	const whipDist = vertical ? WHIP_DIST_V : WHIP_DIST;
 	const blur = t >= J.whip ? Math.min(110, (0.45 * whipDist * pileS * WHIP_POW * Math.pow(whipK, WHIP_POW - 1)) / ((J.end - J.whip) * 30)) : 0;
+	const smear = vertical && blur > 0.5 ? smearAt(cam, t, blur) : 0;
 	const landed = SHOTS.filter((s) => t >= s.t0);
 	const top = landed.length - 1;
 	const pile = t >= J.pile;
@@ -876,7 +956,19 @@ export const Join: React.FC<{t: number}> = ({t}) => {
 			<svg width={0} height={0} style={{position: 'absolute'}}>
 				<defs>
 					<filter id={blurId} x="-20%" y="-5%" width="140%" height="110%">
-						<feGaussianBlur stdDeviation={`${blur.toFixed(1)} 0`} />
+						<feGaussianBlur stdDeviation={`${blur.toFixed(1)} 0`} result={smear > 0 ? 'm' : undefined} />
+						{smear > 0 && (
+							<>
+								<feOffset in="m" dx={-smear} dy={0} result="o" />
+								<feGaussianBlur in="o" stdDeviation={`${Math.max(blur, 0.2 * smear).toFixed(1)} 0`} result="g" />
+								<feComponentTransfer in="g" result="f" colorInterpolationFilters="sRGB">
+									<feFuncR type="linear" slope={SMEAR_FADE} intercept={(1 - SMEAR_FADE) * PAPER_RGB[0]} />
+									<feFuncG type="linear" slope={SMEAR_FADE} intercept={(1 - SMEAR_FADE) * PAPER_RGB[1]} />
+									<feFuncB type="linear" slope={SMEAR_FADE} intercept={(1 - SMEAR_FADE) * PAPER_RGB[2]} />
+								</feComponentTransfer>
+								<feBlend in="m" in2="f" mode="darken" />
+							</>
+						)}
 					</filter>
 				</defs>
 			</svg>
@@ -932,37 +1024,33 @@ export const Join: React.FC<{t: number}> = ({t}) => {
 
 /** The hand-over contract with the neighbours' sections: full bleed on the stage centre. */
 const SEAM: Frame = {k: K_FILL, x: 960, y: 540};
-/** The whole sheet lying on the newsprint. */
-const FIT: Frame = {k: K_FIT, x: 960, y: 540};
 
 /**
  * Couch on the phone. 62.1 opens on the seam as the black sheet rips up, then drifts right to put Dev and Kai inside
- * the safe width. From 62.2 the rostrum frames for the upright frame (couchCamV): each friend's face, cold, on its punch
- * beat, then the whole friend, warm, on the next. 64.2 pulls right back to the whole sofa (the first time we see all
- * four, all warm) as a sheet on the newsprint; 64.3 cuts in on Maya's hand as the room floods out of her palm, with
- * Jess above it; 64.4 back to the whole sheet as it buckles, the framing P8 registers on at 65.1.
+ * the safe width. From 62.2 to the end the camera stays on the seam and the stage frames for the upright frame: each
+ * friend's face, cold, on its punch beat, then the whole friend, warm, on the next (couchCamV); 64.2 the first time we
+ * see all four, all warm, as P7 cut on its crease into two leaves, Jess+Dev above Kai+Sam (Leaf); 64.3 cuts in on
+ * Maya's hand as the room floods out of her palm, with Jess above it; 64.4 back to the leaves as they buckle.
  */
 const COUCH_V = vtrack([
 	[F.couch, SEAM],
 	[F.couch + 0.42, bleed(1000), 0.24],
 	[PUNCH.jess, SEAM],
-	[WIDE, FIT],
-	[WASH, SEAM],
-	// the sheet off its card: the buckling halves lie on the newsprint itself (Fold's lift)
-	[BUCKLE, {...FIT, clip: false}],
 ]);
 
 /**
- * Join on the phone, a face on every beat. 65.1 P8 lands registered on the buckled sheet (the same framing), then pushes
- * into Maya dancing in the middle of it, with the rostrum's own move; 65.2 key only on Dev and Sam; 65.3 P9, Jess and
+ * Join on the phone, a face on every beat. 65.1 P8 lands full bleed on Maya dancing in the middle of the empty sofa
+ * (at the rostrum's MATCH she is at stage x 1087, at frameShot(S8) 980: the camera follows her as the rostrum settles,
+ * holding her at frame x 470); 65.2 key only on Dev and Sam; 65.3 P9, Jess and
  * Maya nose to nose; 65.4 the macro of their mouths; 66.1 P10 Dev in the air; 66.2 off register on Kai; 66.3 P11 Sam
  * spinning; 66.4 her dots burst round her face; 67.1 P12, the whole circle from above (any upright slice of it is a
- * jumble of halftone at full bleed), on its card; 67.2 her face, full bleed; 67.3
- * the pull back and up the column of prints (vspread); 67.4 the whip right, on the seam into the roof.
+ * jumble of halftone at full bleed) drops onto its card, then a snap push down onto Maya in the circle (stage
+ * 1203, 382) that the 67.2 macro of her face cuts in on; 67.3 the pull back and up the column of prints (vspread);
+ * 67.4 the whip right, on the seam into the roof.
  * Stage x of each subject at the rostrum's frameShot(Sn): 960 + (u - 0.5) * 1980 * zoom.
  */
 const JOIN_V = vtrack([
-	[J.p8, FIT],
+	[J.p8, bleed(1126)],
 	[J.p8 + 0.36, bleed(1022), 0.26],
 	[J.key, bleed(1590)],
 	[J.p9, bleed(1066)],
@@ -971,8 +1059,10 @@ const JOIN_V = vtrack([
 	[J.reg, bleed(1250)],
 	[J.p11, bleed(945)],
 	[J.burst, bleed(950)],
-	// the overhead circle only reads whole: the print bleeds off the frame's sides, newsprint above and below it
+	// the overhead circle only reads whole: the print drops onto its card, bleeding off the frame's sides, then the
+	// camera snaps in on Maya in the circle (frame 546, 764 at k 2) for the macro's cut in
 	[J.p12, {k: 0.84, x: 1019, y: 540}],
+	[J.maya - 0.01, bleed(1200, 400, 2), 0.26],
 	[J.maya, SEAM],
 	[J.pile, SEAM],
 ]);

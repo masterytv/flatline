@@ -8,7 +8,7 @@ import {clamp01, CropMarks, easeOut, inked, kickNudge, lerp, RegTarget, Rule, Sl
 import {Cam, Plate, plateDots, Sheet, sheetMatrix} from './press';
 import {CamLayer, Paper, Press} from './Press';
 import {KeepsakePrint} from './s_keepsake';
-import {Frame, K_FILL, useStage, VMap} from './stage';
+import {Frame, K_FILL, useStage, VMap, vtrack} from './stage';
 
 // 3:07.8 to 3:21.9, the final drop back in the living room.
 // Macros: one giant halftone close-up per beat (P41-P43), heat + key only, cream and orange stock in turn.
@@ -648,19 +648,21 @@ const ROLL: RollDef[] = [
 ];
 const SHOVE = 0.2;
 
-// 9:16 (positions given in frame px, held in stage px as the SEAM camera sees them): each print lands big (0.9 scale,
-// 813 x 528 frame px), alternately below and above the word's middle band, the second of each pair on the first like
-// a deal; on the jump the word bumps the top pair up out of the frame ahead of it and the bottom pair is shoved into
-// the bottom corners, where they peek out under the keepsake.
+// 9:16 (positions given in frame px, held in stage px as the SEAM camera sees them): each print lands big (1.08 scale,
+// 975 x 634 frame px) and bleeds about 40 px off the side it is thrown from, alternately below and above the word's
+// middle band (top pair y 31-715, bottom pair y 1195-1892, the word y ~730-1185 with its bounces), the second of each
+// pair on the first like a deal. Each caption sits at the print's outer end, inset (capIn, print px) to clear the bleed
+// and the feed's right-hand buttons (frame x 67 to 935). On the jump the word bumps the top pair up out of the frame
+// ahead of it and the bottom pair is shoved into the bottom corners, where they peek out under the keepsake.
 const FX = (x: number) => 960 + (x - 540) / K_FILL;
 const FY = (y: number) => 540 + (y - 960) / K_FILL;
-const SV = 0.9;
-type RollV = {at: [number, number, number]; corner: [number, number, number]; from: [number, number]; capRight: boolean; shove: number};
+const SV = 1.08;
+type RollV = {at: [number, number, number]; corner: [number, number, number]; from: [number, number]; capRight: boolean; capIn: number; shove: number};
 const ROLL_V: Record<string, RollV> = {
-	P45: {at: [FX(500), FY(1490), -3], corner: [FX(270), FY(1610), -7], from: [-0.5, 1], capRight: false, shove: SHOVE},
-	P46: {at: [FX(590), FY(372), 3], corner: [FX(760), FY(-430), 10], from: [0.5, -1], capRight: true, shove: 0.13},
-	P47: {at: [FX(585), FY(1525), 3.5], corner: [FX(830), FY(1650), 6], from: [1, 0.55], capRight: true, shove: SHOVE},
-	P48: {at: [FX(490), FY(385), -2.5], corner: [FX(300), FY(-450), -10], from: [-1, -0.45], capRight: false, shove: 0.13},
+	P45: {at: [FX(445), FY(1506), -3], corner: [FX(240), FY(1650), -7], from: [-0.5, 1], capRight: false, capIn: 36, shove: SHOVE},
+	P46: {at: [FX(635), FY(342), 3], corner: [FX(780), FY(-490), 10], from: [0.5, -1], capRight: true, capIn: 72, shove: 0.13},
+	P47: {at: [FX(635), FY(1515), 3.5], corner: [FX(860), FY(1690), 6], from: [1, 0.55], capRight: true, capIn: 72, shove: SHOVE},
+	P48: {at: [FX(446), FY(340), -2.5], corner: [FX(290), FY(-500), -10], from: [-1, -0.45], capRight: false, capIn: 36, shove: 0.13},
 };
 
 const rollPose = (p: RollDef, t: number, vertical = false) => {
@@ -688,6 +690,7 @@ const RollPrint: React.FC<{p: RollDef; t: number; map?: Density; n: number}> = (
 	const {vertical} = useStage();
 	const q = rollPose(p, t, vertical);
 	const capRight = vertical ? ROLL_V[p.id].capRight : p.at[0] > 960;
+	const capIn = RB + 2 + (vertical ? ROLL_V[p.id].capIn : 0);
 	const box = {w: RW + 2 * RB, h: RH + RB + RFOOT};
 	// the image centre sits (RFOOT - RB) / 2 above the centre of the paper
 	const r = (q.rot * Math.PI) / 180;
@@ -728,7 +731,7 @@ const RollPrint: React.FC<{p: RollDef; t: number; map?: Density; n: number}> = (
 				}}
 			>
 				{/* the caption sits at the outer end of the strip: the keepsake lands over the inner edges of the bottom two */}
-				<div style={{position: 'absolute', ...(capRight ? {right: RB + 2} : {left: RB + 2}), top: RB + RH + 9, fontFamily: SERIF, fontStyle: 'italic', fontSize: 24, color: INK.key, opacity: 0.85, whiteSpace: 'nowrap'}}>
+				<div style={{position: 'absolute', ...(capRight ? {right: capIn} : {left: capIn}), top: RB + RH + 9, fontFamily: SERIF, fontStyle: 'italic', fontSize: 24, color: INK.key, opacity: 0.85, whiteSpace: 'nowrap'}}>
 					{p.cap}
 				</div>
 			</div>
@@ -956,10 +959,23 @@ export const wordBoxV = (t: number) => {
 	return {x0: Math.min(...tp.map((q) => q[0])) - ox, y0: Math.min(...tp.map((q) => q[1])) - oy, x1: Math.max(...tp.map((q) => q[0])) + ox, y1: Math.max(...tp.map((q) => q[1])) + oy};
 };
 
-/** The phone looks through SEAM throughout these three sections: each one frames itself on its 16:9 stage (the macro
- *  crops, the rostrum camera of the pull and the blast, the deal laid out in SEAM's window), so the vertical camera
- *  only has to hold still, and every boundary, Hoist's and Dawn's included, meets on SEAM. */
+/** The phone looks through SEAM through most of these three sections: each one frames itself on its 16:9 stage (the
+ *  macro crops, the rostrum camera of the pull and the blast, the deal laid out in SEAM's window), so the vertical
+ *  camera mostly holds still, and every boundary, Hoist's and Dawn's included, meets on SEAM. */
 const SEAM: Frame = {k: K_FILL, x: 960, y: 540};
 
+/** The payoff (bar 108): the keepsake lands under DANCING on SEAM, then the camera pushes into it as the grease pencil
+ *  starts (108.2: Maya's face at frame ~(526, 1096), ring ~220 x 320 px, the print bleeding off both sides below the
+ *  word, '3:17 am, everyone' at y ~1560-1615), pushes again as the circle closes (108.3: face ~(534, 1077)), and is
+ *  back on SEAM for the last bounce (108.4) so Dawn takes the sheet over unchanged. k 2.75 on the close, not more:
+ *  any tighter and the print's raised right corner (it lies at -1.6 deg) meets DANCING's G while the caption drops
+ *  into the feed's bottom bar. DANCING is in the frame (vextra), so it stays put in the top band. */
+const EXPLOSION_V = vtrack([
+	[B.blast, SEAM],
+	[B.pencil, {k: 2.6, x: 905, y: 494}, 0.12],
+	[B.close, {k: 2.75, x: 902, y: 504}, 0.12],
+	[B.last, SEAM, 0.15],
+]);
+
 /** The 9:16 cut: each section's reframing camera over the 16:9 stage, and any vertical-only layer (see stage.tsx). */
-export const V: VMap = {Macros: {v: () => SEAM}, R9Pull: {v: () => SEAM}, Explosion: {v: () => SEAM, vextra: DancingV}};
+export const V: VMap = {Macros: {v: () => SEAM}, R9Pull: {v: () => SEAM}, Explosion: {v: EXPLOSION_V, vextra: DancingV}};

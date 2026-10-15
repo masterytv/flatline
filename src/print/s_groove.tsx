@@ -8,7 +8,7 @@ import {ANTON, hash2, INK, MONO, SERIF} from './ink';
 import {clamp01, CropMarks, easeIn, easeInOut, easeOut, inked, lerp, RegTarget, Rule, Slug, stamp, Tape} from './kit';
 import {Cam, CAM0, Plate, Sheet} from './press';
 import {CamLayer, Paper, PaperFill, Press, SheetCanvas} from './Press';
-import {bleed, Frame, K_FILL, useStage, VMap, vtrack} from './stage';
+import {bleed, Frame, K_FILL, K_FIT, useStage, VMap, vtrack} from './stage';
 
 // 2:07.1 to 2:23.6, the groove (bars 68 to 76): up on the roof.
 // NoPain (68.1-70.4): the whip lands on P13, the friends bursting out of the stairwell; then a wood-type poster, one
@@ -621,8 +621,20 @@ const LightWord: React.FC<{t: number; t0: number; text: string; y: number; size:
 	);
 };
 
-// 9:16: the two lines set to the phone's safe width on the lantern, which the phone holds full bleed
-const V_LIGHT = {size: 114, y: [300, 440]};
+// 9:16: the two lines set to the phone's safe width inside the orb, which the phone holds full bleed
+const V_LIGHT = {size: 114, y: [366, 486]};
+/** 9:16: the dive's landing pulls back until the lantern is a whole orb inside the phone's width (about 900 frame px
+ * at K_FILL), ringed by the sky's dots, the hand rising into it. The sheet stays FULL and the picture shrinks inside it:
+ * the crop runs past the photo's top and bottom edges (the sampler clamps, so the even sky simply carries on) and the
+ * screen shrinks with the picture, so it is the same print, smaller. The orb's centre sits on stage (960, V_ORB). */
+const V_P18 = {k: 0.72, y: 550};
+const V_ORB = V_P18.y;
+const V_P18_CROP: Crop = (() => {
+	const c = 1 / V_P18.k;
+	const x0 = P18_LANTERN[0] - 0.5 * c;
+	const y0 = P18_LANTERN[1] - (0.5 + (V_P18.y - FULL.cy) / FULL.h) * c;
+	return [x0, y0, x0 + c, y0 + c];
+})();
 
 export const Light: React.FC<{t: number}> = ({t}) => {
 	const d = useDensities(['P18', 'P19']);
@@ -641,6 +653,8 @@ export const Light: React.FC<{t: number}> = ({t}) => {
 			s: lerp(from.s, 1, e) * push,
 			seed: 18,
 			plates: [p18Plate(lightMask(t, d.P18))],
+			// 9:16: from the counter's exact sheet, the picture (and its screen) shrinks to the orb as it settles
+			...(vertical ? {crop: V_P18_CROP.map((c, i) => lerp(i < 2 ? 0 : 1, c, e)) as Crop, plates: [{...p18Plate(lightMask(t, d.P18)), cell: P18_CELL * lerp(1, V_P18.k, e)}]} : {}),
 		};
 		return (
 			<AbsoluteFill style={{background: INK.paper}}>
@@ -825,7 +839,8 @@ const TimeCardFace: React.FC<{t: number; m1: Density; vertical?: boolean}> = ({t
 			{tape && (
 				<div style={{position: 'absolute', left: PHOTO.x, top: PHOTO.y, width: PHOTO.w, height: PHOTO.h, transform: `rotate(${lerp(9, 2.5, tp)}deg) scale(${lerp(1.12, 1, tp)})`, transformOrigin: '50% 40%', boxShadow: '0 3px 8px rgba(50,32,15,0.3)'}}>
 					<Paper x={0} y={0} w={PHOTO.w} h={PHOTO.h} tint="#F7F2E8" />
-					<SheetCanvas res={2} sheet={{map: m1, w: PHOTO.w, h: PHOTO.h, crop: M1_CROP, seed: 1, plates: heatKey(4.6)}} />
+					{/* 9:16: the phone punches in past 3x on the photo, so it is screened at a finer resolution (same dots) */}
+					<SheetCanvas res={vertical ? 3.5 : 2} sheet={{map: m1, w: PHOTO.w, h: PHOTO.h, crop: M1_CROP, seed: 1, plates: heatKey(4.6)}} />
 					<Tape x={30} y={6} w={110} h={34} rot={-38} seed={3} />
 					<Tape x={PHOTO.w - 26} y={PHOTO.h - 8} w={110} h={34} rot={-36} seed={8} />
 				</div>
@@ -1010,6 +1025,10 @@ export const TimeCard: React.FC<{t: number}> = ({t}) => {
 	const tip = easeOut((t - FOREVER) / (4 / 30));
 	const drop = easeIn((t - FOREVER) / CARD_EXIT);
 	const cardGone = t >= FOREVER + CARD_EXIT;
+	// 9:16: the landing slap turns the card about its own centre (not its foot), so the phone's centred frame holds it
+	const th0 = (-1.5 * Math.PI) / 180;
+	const th1 = ((-1.5 + spin) * Math.PI) / 180;
+	const land = vertical ? `translate(${(490 * (Math.sin(th0) - slap * Math.sin(th1))).toFixed(2)}px, ${(490 * (slap * Math.cos(th1) - Math.cos(th0))).toFixed(2)}px) ` : '';
 	// 'gone' (and its arrow) only on the wide shots: a cut-in would crop it to debris
 	const wide = (t >= GONE && t < IN) || (t >= TOTAL && t < FOREVER);
 	return (
@@ -1043,7 +1062,7 @@ export const TimeCard: React.FC<{t: number}> = ({t}) => {
 							position: 'absolute',
 							inset: 0,
 							transformOrigin: '50% 100%',
-							transform: `translateY(${1250 * drop}px) rotateX(${62 * tip}deg) rotate(${-1.5 + spin + 6 * drop}deg) scale(${slap})`,
+							transform: `${land}translateY(${1250 * drop}px) rotateX(${62 * tip}deg) rotate(${-1.5 + spin + 6 * drop}deg) scale(${slap})`,
 							boxShadow: `0 ${18 - 10 * tip}px ${40 - 20 * tip}px rgba(50,32,15,0.28)`,
 						}}
 					>
@@ -1207,16 +1226,21 @@ const NOPAIN_V = vtrack([
 ]);
 
 /**
- * Just light on the phone. 70.4 the dive lands on the lantern on the seam; 71.1 'just light,' pushes in on the
- * lantern; 71.2 'so bright' pulls back as the light eats the sheet; 71.3 the white-out, full bleed, breathing in on
+ * Just light on the phone. 70.4 the dive lands on the lantern on the seam and the print pulls back until the lantern
+ * is a whole white orb ringed by dots, the hand rising into it; 71.1 'just light,' and 71.2 'so bright' each push in
+ * about 11% on the orb as the light eats the sheet; 71.3 the white-out, full bleed, breathing in on
  * the blank sheet; 71.4 P19 prints back: the phone looks at the night sky left of her, where 'I'm not the same' is
  * knocked out as the ink comes round it (the 16:9 placement, whole in the frame); 72.1 a whip onto her laughing face
  * as the key plate lands.
  */
+/** Pushed in by f about the orb's centre (so the orb grows in place), the lines kept centred on the safe width
+ * (frame x 60-940) as they outgrow it. */
+const orbPush = (f: number): Frame => ({k: K_FILL * f, x: 960 + 40 / (K_FILL * f), y: V_ORB + (540 - V_ORB) / f});
 const LIGHT_V = vtrack([
 	[F.light, SEAM],
-	[JUST, bleed(960, 505, 2), 0.16],
-	[BRIGHT, bleed(960)],
+	// the sheet pulls back to the whole orb as the dive settles; then it grows into the light on the two beats
+	[JUST, orbPush(1.12), 0.15],
+	[BRIGHT, orbPush(1.12 * 1.1), 0.15],
 	// the white-out full bleed, breathing in on the blank sheet (no dots to shimmer)
 	[WHITE, SEAM],
 	[GROW - 0.01, bleed(960, 540, 2), 0.42],
@@ -1228,21 +1252,27 @@ const card = (k: number, x: number, y: number): Frame => ({k, x, y, clip: false}
 
 /**
  * The time card on the phone, a new mark read on every beat; the phone's camera runs past the stage edge (clip off)
- * so the card can be travelled. 72.2 the card lands whole with OUT 01:48; 72.3 'gone' written into its empty photo
- * box, the arrow down to 01:48; 72.4 the rows, OUT 01:48 / IN 01:52; 73.1 her photo taped over 'gone'; 73.2 the foot
- * of the card, TOTAL 4:00 and 'four minutes' written under it; 73.3 'forever': the whole ∞ stamped on the sheet as
- * the card drops away; 73.4 in on the crossing as the key lands, their joined hands where the strokes cross; 74.1
+ * so the card can be travelled. 72.2 the card lands whole and centred with OUT 01:48; 72.3 'gone' written into its
+ * empty photo box, the arrow down to 01:48; 72.4 the rows, OUT 01:48 / IN 01:52; 73.1 her photo taped over 'gone';
+ * 73.2 the foot of the card, TOTAL 4:00 and 'four minutes' written under it; 73.3 'forever': the ∞'s left loop
+ * stamped whole (Jess on its arc) as the card drops away, then a 0.3 s travel along the band to the crossing, landing
+ * as the key does on 73.4, their joined hands where the strokes cross; 74.1
  * 'free' in the left counter under Jess; 74.2 'forever' in the right one under Sam.
  */
 const TIMECARD_V = vtrack([
-	[OUT, card(1.22, 960, 575)],
-	[GONE, card(2.3, 1088, 474)],
-	// the card's left column (Maya, OUT, IN) clear of the frame's edge; 'gone', read on the beat before, at the right
-	[IN, card(1.5, 925, 742)],
-	[TAPE, card(2.7, 1159, 388)],
+	// the whole card, centred on its settled centre (it lands turning about that centre on the phone)
+	[OUT, card(1.05, 947, 548)],
+	// the title row wholly above the frame: the box with 'gone', the arrow and 01:48 stacked down the phone
+	[GONE, card(2.3, 1088, 607)],
+	// the card's left column (Maya, OUT, IN) clear of the frame's edge; 'gone', read on the beat before, at the right;
+	// the title whole at the top
+	[IN, card(1.5, 925, 708)],
+	// in on the photo: the title's D off the left edge, the OUT row wholly below the frame
+	[TAPE, card(3.1, 1162, 350)],
 	[TOTAL, card(1.7, 905, 955)],
-	[FOREVER, {k: 0.63, x: 960, y: 548}],
-	[KEY20, bleed(960)],
+	// the left loop whole (Jess on its top arc) as the card drops away, then along the band to the crossing
+	[FOREVER, {k: 1.14, x: 540, y: 548}],
+	[KEY20, bleed(960), 0.3],
 	// left of the counter's centre, so Jess's face (stage 386, 177 on this step) is on the band in frame, 'free' still inside the safe width
 	[MARCH[0], bleed(STEPS[1].cx - INF_C * STEPS[1].r - 62, STEPS[1].cy)],
 	[MARCH[1], bleed(STEPS[2].cx + INF_C * STEPS[2].r, STEPS[2].cy)],
@@ -1253,8 +1283,8 @@ const P23_X = (u: number) => SA.cx - SA.w / 2 + u * SA.w;
 
 /**
  * Strips on the phone, a framing per beat. 74.3 the faces out of phase, full bleed; 74.4 punched in on them; 75.1
- * the swap; 75.2 in again; 75.3 'together': the strips snap into P23 and the phone pulls back to the whole line of
- * the five, lying on the newsprint; 75.4 Maya with Kai and Dev; 76.1 the key-only flash on Jess and Kai; 76.2 Dev and Sam; 76.3 the scatter onto
+ * the swap; 75.2 in again; 75.3 'together': the strips snap into P23 and the phone pulls back to the whole sheet
+ * (K_FIT) for the one beat, all five whole as the print locks; 75.4 Maya with Kai and Dev; 76.1 the key-only flash on Jess and Kai; 76.2 Dev and Sam; 76.3 the scatter onto
  * the phone on the counter; 76.4 the push onto it, where the receipt (s_back) picks up.
  */
 const STRIPS_V = vtrack([
@@ -1262,8 +1292,8 @@ const STRIPS_V = vtrack([
 	[bt(74, 4), bleed(960, 385, 2.6)],
 	[SWAP, bleed(990)],
 	[bt(75, 2), bleed(940, 400, 2.3)],
-	// the five whole, Jess's face (u 0.18-0.26) to Sam's (0.79-0.85): the healed line lying on the newsprint for a beat
-	[TOGETHER, {k: 0.8, x: (P23_X(0.182) + P23_X(0.85)) / 2, y: 540}],
+	// the whole sheet for one beat: every strip snapping into P23 reads as one print locking, all five whole
+	[TOGETHER, {k: K_FIT, x: 960, y: 540}],
 	[bt(75, 4), bleed(P23_X(0.52))],
 	[KEYFLASH, bleed(P23_X(0.3))],
 	[bt(76, 2), bleed(P23_X(0.73))],

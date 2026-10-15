@@ -372,13 +372,23 @@ const BLOCKS: Block[] = [
 		],
 	},
 ];
+/**
+ * 9:16: a length of bare paper leads the 'maya.' block, so on 78.3 the strip throws I'M COMING BACK clean out of the
+ * top of the frame (with the stage's lift, p24GeoV) instead of leaving COMING and BACK sliced along its top edge.
+ */
+const GONE_LEAD_V = 140;
+const BLOCKS_V: Block[] = BLOCKS.map((k) => (k.at === GONE ? {...k, h: k.h + GONE_LEAD_V, lines: [{s: '', size: GONE_LEAD_V / 0.98}, ...k.lines]} : k));
 const SPOOL_BEATS = beatsIn(C_SPOOL - 0.01, D_P25 - 0.01).map((b) => b.t);
-const SPOOL_JUMP = SPOOL_BEATS.map((b) => BLOCKS.find((k) => Math.abs(k.at - b) < 1e-3)?.h ?? 46);
+const jumpsOf = (blocks: Block[]) => SPOOL_BEATS.map((b) => blocks.find((k) => Math.abs(k.at - b) < 1e-3)?.h ?? 46);
 const CREEP = 70; // px of paper a second between the jumps
-const feed = (t: number) => (t < C_SPOOL ? 0 : CREEP * (t - C_SPOOL) + stepped(t, SPOOL_BEATS, SPOOL_JUMP, 0.1));
+const feedOf = (jumps: number[]) => (t: number) => (t < C_SPOOL ? 0 : CREEP * (t - C_SPOOL) + stepped(t, SPOOL_BEATS, jumps, 0.1));
+const feed16 = feedOf(jumpsOf(BLOCKS));
+const feedV = feedOf(jumpsOf(BLOCKS_V));
 
 /** The strip in its own space: x 0..SPOOL_W, y up from the slot (y = 0) into negative values. */
-const Spool: React.FC<{t: number}> = ({t}) => {
+const Spool: React.FC<{t: number; v?: boolean}> = ({t, v = false}) => {
+	const feed = v ? feedV : feed16;
+	const blocks = v ? BLOCKS_V : BLOCKS;
 	const F0 = feed(t);
 	const top = -F0;
 	// the trace down the left margin: one spike per beat, full height on the beeps
@@ -405,7 +415,7 @@ const Spool: React.FC<{t: number}> = ({t}) => {
 					<polyline points={pts.join(' ')} fill="none" stroke={INK.cold} strokeWidth={3.2} strokeLinejoin="round" />
 				</g>
 			</svg>
-			{BLOCKS.filter((k) => k.at <= t).map((k, i) => {
+			{blocks.filter((k) => k.at <= t).map((k, i) => {
 				const yTop = -(F0 - feed(k.at));
 				let y = yTop + 8;
 				return (
@@ -502,12 +512,14 @@ const SPOOL_GEO_V: Geo = (() => {
 	return {...g0, cx: g0.cx + dx, cy: g0.cy + dy};
 })();
 /**
- * 78.4: the camera's push onto "maya. you've been gone 47 min" (RECEIPT_V) can't tilt down any further (it is at the
- * stage's foot), so the stage lifts the phone and its strip with it, in the same 0.2 s ease: BACK clears the top of
- * the frame instead of hanging half-cropped there, and the battery comes up under the line.
+ * The camera can't tilt down any further than the stage's foot, so the stage lifts the phone and its strip: on 78.3
+ * with the strip's jump, so "maya. you've been gone 47 min" lands in the middle of the frame (I'M COMING BACK thrown
+ * out of the top) with the battery clear of the feed's bottom band; and on the 78.4 push onto the line (RECEIPT_V) a
+ * little further, in the same 0.2 s ease, bringing the battery up under it.
  */
 const PUSH_GONE = bt(78, 4);
 const PUSH_DUR = 0.2;
+const LIFT_GONE_V = 107;
 const LIFT_V = 145;
 const p24GeoV = (t: number): Geo => {
 	if (t < B_MACRO) return p24Geo(t);
@@ -516,7 +528,8 @@ const p24GeoV = (t: number): Geo => {
 	const g = lerpGeo(mac, SPOOL_GEO_V, easeOut((t - C_SPOOL) / 0.16));
 	// the lyric punches grow the strip about its foot, so the line that lands stays put
 	const s = scaleAbout(g, TEXT_XV, SLOT_YV, 1 + punch(t, BACK, 0.05) + punch(t, GONE, 0.05));
-	return {...s, cy: s.cy - LIFT_V * easeInOut(clamp01((t - (PUSH_GONE - PUSH_DUR)) / PUSH_DUR))};
+	const lift = LIFT_GONE_V * easeOut(clamp01((t - GONE) / 0.1)) + (LIFT_V - LIFT_GONE_V) * easeInOut(clamp01((t - (PUSH_GONE - PUSH_DUR)) / PUSH_DUR));
+	return {...s, cy: s.cy - lift};
 };
 
 const P24Shot: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
@@ -546,7 +559,7 @@ const P24Shot: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 			<LimeScreen quad={quad} W={900} H={420} pct={pctAt(t)} t={t} beats={PCT_BEATS} />
 			{spool && (
 				<div style={{position: 'absolute', left: L[0] + inset * Math.cos(ang), top: L[1] + inset * Math.sin(ang) + 6, transformOrigin: '0 0', transform: `skewY(${(ang * 180) / Math.PI}deg) scale(${k})`}}>
-					<Spool t={t} />
+					<Spool t={t} v={vertical} />
 				</div>
 			)}
 		</>
@@ -575,10 +588,19 @@ const CAM_P25 = bleed(560);
 const CAM_P26: Frame = {k: 1.89, x: 760, y: 553};
 const CAM_FLOOD = bleed(1150);
 
+/**
+ * 9:16: the phone lies at the photo's foot, so on a full-bleed frame its lime strip (the climbing %, the threat here)
+ * printed under the feed's caption at frame y 1590-1730, and no camera can see lower than the stage's foot. So the
+ * print is lifted and laid on the newsprint like the P26 card that slaps over it, a touch askew: its foot and shadow
+ * fall in the feed's bottom band and the % reads at frame y 1400-1550.
+ */
+const LIFT25_V = 105;
+const ROT25_V = 0.7;
+
 const P25Shot: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 	const {vertical} = useStage();
 	const sl = slap(t, D_P25);
-	const g: Geo = {...FULL, s: sl.s};
+	const g: Geo = vertical ? {...FULL, s: sl.s, cy: FULL.cy - LIFT25_V, rot: ROT25_V} : {...FULL, s: sl.s};
 	const R = stepped(t, [D_P25, LIKES, TAGS, REACH], [0.16, 0.12, 0.12, 0.3], 0.16);
 	const cold = spreadMask(PHONE25.u, PHONE25.v, R, 25);
 	const [kx, ky] = kickNudge(t, 25, 2.2);
@@ -593,13 +615,21 @@ const P25Shot: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 	return (
 		<>
 			<PaperFill />
+			{vertical && (
+				<OnSheet sheet={g}>
+					<div style={{position: 'absolute', inset: 0, boxShadow: sl.on ? sl.shadow : 'none'}}>
+						<Paper x={0} y={0} w={g.w} h={g.h} />
+					</div>
+				</OnSheet>
+			)}
 			<Press sheets={[{map: d.P25, ...g, plates, seed: 25}]} />
 			<LimeScreen quad={quad} W={1000} H={240} pct={pctAt(t)} t={t} beats={PCT_BEATS} amp={0.28} />
 			{vertical ? (
-				// the phone: the likes over her head, the tags across her as the cold climbs to her
+				// the phone: the likes over her head (top left, over the fridge, so her laughing face stays clear of it on the
+				// lifted print), the tags across her as the cold climbs to her
 				<>
-					<Card x={onStage(CAM_P25, 92, 236)[0]} y={onStage(CAM_P25, 92, 236)[1]} w={360} t={t} at={LIKES} rot={-2.2} text="You missed 212 likes" size={46} seed={1} />
-					<Card x={onStage(CAM_P25, 150, 1120)[0]} y={onStage(CAM_P25, 150, 1120)[1]} w={410} t={t} at={TAGS} rot={1.6} head="TOKTIC · JESS.WAV" text="jess.wav tagged you in 14 photos" size={38} seed={2} />
+					<Card x={onStage(CAM_P25, 60, 228)[0]} y={onStage(CAM_P25, 60, 228)[1]} w={262} t={t} at={LIKES} rot={-2.2} text="You missed 212 likes" size={34} seed={1} />
+					<Card x={onStage(CAM_P25, 150, 1080)[0]} y={onStage(CAM_P25, 150, 1080)[1]} w={410} t={t} at={TAGS} rot={1.6} head="TOKTIC · JESS.WAV" text="jess.wav tagged you in 14 photos" size={38} seed={2} />
 				</>
 			) : (
 				<>
@@ -974,8 +1004,16 @@ const ColdFace: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => 
 	);
 };
 
+/**
+ * 9:16: P28's screen. The phone's frame shows Jess's face 1.8 to 2x the stage, where the 8.5 px screen leaves it about
+ * 25 dots wide at 15 to 17 frame px a dot: her eyes and laugh broke up into a ring of hair around orange blobs. A finer
+ * screen, as on P25 and the cold close-up, keeps her laughing face readable through the doorway, the punch and the flood.
+ */
+const CELL28_V = 5;
+
 /** 155.504: Jess in the bright doorway, calling her. */
 const JessShot: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
+	const {vertical} = useStage();
 	const sl = slap(t, JESS);
 	// tight enough for her face to read (and her held-out hand and the bright doorway stay in), so the split's 2.17x
 	// continues the push
@@ -983,7 +1021,7 @@ const JessShot: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => 
 	return (
 		<>
 			<PaperFill />
-			<Press sheets={[{map: d.P28, ...g, plates: warmPlates(t, 8.5, 28), seed: 28}]} />
+			<Press sheets={[{map: d.P28, ...g, plates: warmPlates(t, vertical ? CELL28_V : 8.5, 28), seed: 28}]} />
 		</>
 	);
 };
@@ -1031,32 +1069,37 @@ const Split: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 	);
 };
 
-// 9:16: the split runs top and bottom. Cold Maya above the cut, looking down at it; warm Jess below it, calling up;
-// each anchored to the cut, so every shove pushes the other one's face out of the frame. 84.1 the cold slams down
-// from the top; 84.2 warm shoves it up; 84.3 cold shoves back down; 84.4 warm takes the frame and floods into the drop.
+// 9:16: the split runs top and bottom. Cold Maya above the cut, looking down at it; warm Jess below it, calling up.
+// Each face rides its own band, her eyes 40% of the way down it, so every shove squeezes the other one's face without
+// pushing her eyes out of the frame (or under the feed's bands): under the seam camera frame y = 1.78 x stage y, so at
+// the stops (cut at stage y 540, 330, 730) Maya's eyes sit at frame y 384, 235, 519 and Jess's at 1344, 1120, 1547.
+// 84.1 the cold slams down from the top; 84.2 warm shoves it up; 84.3 cold shoves back down; 84.4 warm takes the
+// frame and floods into the drop, her eyes settling at frame y 836.
 const splitY = (t: number) => {
 	const e = (t0: number) => {
 		const k = clamp01((t - t0) / 0.1);
 		return k <= 0 ? 0 : 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2);
 	};
 	let y = 540 * e(SPLIT);
-	y += (320 - 540) * e(WARM_PUSH);
-	y += (760 - 320) * e(COLD_PUSH);
-	y += (-160 - 760) * easeOut((t - WARM_FLOOD) / 0.14);
+	y += (330 - 540) * e(WARM_PUSH);
+	y += (730 - 330) * e(COLD_PUSH);
+	y += (-160 - 730) * easeOut((t - WARM_FLOOD) / 0.14);
 	return y;
 };
-/** Jess's face in P28 (traced). */
-const JESS28_FACE = {u: 0.505, v: 0.44};
+/** The eyes in P27 (Maya) and P28 (Jess), traced. */
+const MAYA27_EYES = {u: 0.65, v: 0.305};
+const JESS28_EYES = {u: 0.505, v: 0.425};
+const EYES_IN_BAND = 0.4;
 
 const SplitV: React.FC<{t: number; d: Record<string, Density>}> = ({t, d}) => {
 	const y = splitY(t);
 	const flood = clamp01((t - WARM_FLOOD) / (F.drop3 - WARM_FLOOD));
 	const lean = 40; // the cut rises a little to the right, like a hand-cut edge (about 44 frame px across the phone)
-	const cold = aim(FACE27.u, FACE27.v + 0.03, 1.6, 960, y - 270);
-	const wy = lerp(y + 220, 540, easeOut((t - WARM_FLOOD) / 0.14));
-	const warm = aim(JESS28_FACE.u, JESS28_FACE.v, (1 + 0.06 * flood) * 1.9, 960, wy);
+	const cold = aim(MAYA27_EYES.u, MAYA27_EYES.v, 1.6, 960, EYES_IN_BAND * y);
+	const wy = lerp(y + EYES_IN_BAND * (1080 - y), 470, easeOut((t - WARM_FLOOD) / 0.14));
+	const warm = aim(JESS28_EYES.u, JESS28_EYES.v, (1 + 0.06 * flood) * 1.9, 960, wy);
 	const [kx, ky] = kickNudge(t, 84, 3);
-	const warmPl: Plate[] = [HEAT(8.5, {dx: kx, dy: ky, gain: 1 + 1.8 * easeIn(flood), lift: -0.55 * easeIn(flood)}), KEY(8.5)];
+	const warmPl: Plate[] = [HEAT(CELL28_V, {dx: kx, dy: ky, gain: 1 + 1.8 * easeIn(flood), lift: -0.55 * easeIn(flood)}), KEY(CELL28_V)];
 	const coldPl: Plate[] = [COLD(8, {gain: 1.12, mask: maya27}), KEY(8.5, {gain: 0.9, mask: maya27})];
 	const topClip = `polygon(-10px -10px, 1930px -10px, 1930px ${y - lean - 5}px, -10px ${y + lean - 5}px)`;
 	const bottomClip = `polygon(-10px ${y + lean + 5}px, 1930px ${y - lean + 5}px, 1930px 1090px, -10px 1090px)`;
@@ -1132,9 +1175,11 @@ const STRIPS_END = bleed(1150, 640, 2.2);
  * Receipt on the phone: the phone fights back, and the frame becomes its screen. 77.1 the strips' push onto the phone
  * carries on as it wakes lime, 1%; 77.2 the "2%" across the frame; 77.3 the phone drops to the foot of the frame and
  * the receipt shoots up the middle of it, strip as wide as the frame; 77.4 in on its head; 78.1 back out as I'M
- * COMING BACK slams in; 78.2 in on COMING BACK; 78.3 out as "maya. you've been gone 47 min" lands; 78.4 a push on it as the phone lifts the line and its battery up the frame (BACK out of the top).
- * 79.1 P25: Maya laughing, her back to the phone at the foot of the frame; 79.2 the likes card
- * over her head; 79.3 the tags across her; 79.4 a push as the cold reaches her. 80.1 P26: Dev and his butter knife;
+ * COMING BACK slams in; 78.2 in on COMING BACK; 78.3 out as "maya. you've been gone 47 min" lands mid-frame, the
+ * strip throwing I'M COMING BACK out of the top; 78.4 a push on it as the phone lifts the line and its battery up the
+ * frame. 79.1 P25, the print laid on the newsprint: Maya laughing, her back to the phone and its battery near the
+ * foot of the frame; 79.2 the likes card over her head; 79.3 the tags across her; 79.4 a short push as the cold
+ * reaches her. 80.1 P26: Dev and his butter knife;
  * 80.2 the stage punches on him; 80.3 'Stay connected?' takes the lower half of the phone; 81.1-81.4 the flood: a
  * face per beat under a stack of notifications, newest on top, the battery and the countdown ticking.
  */
@@ -1148,37 +1193,45 @@ const RECEIPT_V = vtrack([
 	[GONE, SEAM],
 	[PUSH_GONE, bleed(TEXT_XV + 40 / 1.87, 600, 1.87), PUSH_DUR],
 	[D_P25, CAM_P25],
-	[REACH, bleed(560, 505, 1.9), 0.14],
+	// a short push that holds the likes card under the feed's top band and the lifted print's battery above its bottom one
+	[REACH, bleed(560, 520, 1.86), 0.14],
 	[E_P26, CAM_P26],
 	[FLOOD[0], CAM_FLOOD],
 ]);
 
 /**
  * TearOff on the phone. 82.1 the flood tears corner to corner through the frame and the halves fly, P27 under it;
- * 82.2 down on the phone in her hand, 100%; 82.3 her face, looking down, 'to feel everything' stamped under it;
- * 82.4 closer; 83.1-83.2 the cold punch-in, her face over the line, held through the kick-out; 83.3 P28, Jess in the doorway,
- * hand out; 83.4 in on her face; 84.1 the split, top and bottom, on the seam into the drop.
+ * 82.2 down on the 100% phone in her cold hand, the warm friends behind it; 82.3 her face, looking down, 'to feel
+ * everything' stamped under it; 82.4 closer; 83.1-83.2 the cold punch-in, her face over the line, held through the
+ * kick-out; 83.3 P28, Jess in the doorway, hand out (on a finer screen); 83.4 in on her face; 84.1 the split, top and
+ * bottom, each face riding its band, on the seam into the drop.
  */
 const TEAROFF_V = vtrack([
 	[TEAR, CAM_FLOOD],
-	[NUDGE1, bleed(890, 711, 2.6)],
-	[CAPTION, bleed(1270)],
+	// the 100% phone in her cold hand against the warm friends: Kai and Dev's faces at frame y 530, "100%" at 1400
+	[NUDGE1, bleed(760, 600, 2.0)],
+	// her face; far enough right that the phone's lime corner leaves the frame's bottom-left edge
+	[CAPTION, bleed(1310)],
 	[NUDGE2, bleed(1275, 430, 2.1)],
 	[PUNCH, bleed(1000, 540)],
 	[JESS, bleed(990)],
-	[JESS2, bleed(1094, 420, 2.5)],
+	// in on her laughing face, capped at 2x so the punch doesn't blow her up into dots
+	[JESS2, bleed(1080, 450, 2.0)],
 	[SPLIT, SEAM],
 ]);
 
-/** 'to feel everything' in the phone's own frame: screen space, as in 16:9, stamped under her face. */
+/**
+ * 'to feel everything' in the phone's own frame: screen space, as in 16:9, stamped under her face, centred on the safe
+ * area (x 60..940) so 'everything' (about 800 px) keeps clear of the frame's edge and the feed's buttons.
+ */
 const TearOffType: React.FC<{t: number}> = ({t}) => {
 	const st = stamp(t, CAPTION);
 	if (!st.on || t >= JESS) return null;
 	return (
 		<svg width={1080} height={1920} style={{position: 'absolute', left: 0, top: 0, overflow: 'visible', ...inked(900, 11, 3, true)}}>
-			<g transform={`translate(70 1560) scale(${st.s}) translate(-70 -1560)`}>
+			<g transform={`translate(500 1480) scale(${st.s}) translate(-500 -1480)`}>
 				{(['to feel', 'everything'] as const).map((w, i) => (
-					<text key={w} x={70} y={1375 + i * 185} fontFamily="Instrument Serif" fontStyle="italic" fontSize={215} fill={INK.key} stroke={INK.paper} strokeWidth={36} strokeLinejoin="round" paintOrder="stroke">
+					<text key={w} x={500} y={1397 + i * 163} textAnchor="middle" fontFamily="Instrument Serif" fontStyle="italic" fontSize={189} fill={INK.key} stroke={INK.paper} strokeWidth={32} strokeLinejoin="round" paintOrder="stroke">
 						{w}
 					</text>
 				))}
