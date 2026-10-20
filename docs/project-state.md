@@ -1,5 +1,41 @@
 # 0% music video (song: Flatline): project state
 
+## Status at handoff (2026-10-15, read this first)
+- **9:16 (Tom approved the 16:9 on 2026-10-15 and asked for the vertical).** `Flatline0Vertical` (1080×1920) is built. The opening already had its vertical layout (the phone fills the frame). Print plays every section on its unchanged 1920×1080 stage inside the vertical frame, seen through a per-section reframing camera; type that a camera can't hold is re-laid out for the phone. 540×960 previews with the song: out/flatline0-vertical-preview.mp4 and a 30 MB copy, flatline0-vertical-preview-small.mp4 (first cut and the polished cut sent to Tom 2026-10-15; waiting on his notes).
+  - The machinery is src/print/stage.tsx: `Frame {k, x, y, bg, clip}` (the stage point at the frame centre, scale k; `K_FIT` 0.5625 shows the stage's full width, `K_FILL` 1.778 fills the height), `vtrack` (beat-keyed cuts and short eases), `bleed()` and `toFrame()`, and `useStage()` (stage size, `vertical`, the Press canvas resolution, which follows the zoom up to 2×). Each s_*.tsx exports `V: VMap` (camera `v`, frame-space overlay `vextra`), which Print.tsx merges in by component name. Every vertical layout change is gated on `useStage().vertical`, so the 16:9 cut is pixel-identical (19 Flatline0 frames compared after each round).
+  - Vertical design rules (framing on faces, more cuts rather than smaller pictures, lyric type at least 140 px cap height inside x 60–940 and y 220–1620 clear of the feed UI, SEAM `{k: K_FILL, x: 960, y: 540}` where a picture flows across a group boundary) were followed by the section builders; `PrintDevV` in every src/print/dev/<group>.ts renders a group's vertical frames.
+  - Phone layouts: FLAT / LINE stacked, a portrait exploded view and a loop round the phone's edge for the TokTic parts, the feed as a column, DAN / CING, NO / PAIN…, the receipt running down the frame, an upright battery charging bottom to top, the couch sheet folded into a 2×2 for the wide, the zine page filling the frame.
+  - Known renderer noise: some frames render in one of two states up to 3 levels apart (paper grain, load dependent). A strict pixel regression should re-render a frame that differs by 3 or less before calling it a change.
+- The whole video is built: the phone-screen opening (0:00–1:24.8) with the new photo set, then Proof of Life (src/print) from the shatter to the end card, with the three grafts and Tom's four fixes. A full 960×540 preview with the song went to Tom on 2026-10-15 (out/flatline0-preview.mp4, plus a 30 MB copy, flatline0-preview-small.mp4, for the upload limit). Tom approved it the same day.
+- New container: download Flatline.mp3 (below) into media/ and public/; the stills are NOT in Drive (the Drive tools can't upload images). They can be re-downloaded without credits with `python3 scripts/runway_stills.py --fetch` only while Runway keeps the task outputs; media/stills/tasks.json is local. Then `npm run stills:small` and `python3 src/print/tools/print_plates.py` (plates go to public/plates).
+- Runway: 720 credits spent ($7.20 of Tom's $20 cap), 550 left.
+- Lyric cues placed on bar lines that Tom should ear-check (everything else is snapped to his by-ear times): 1:35.85 MY HEART, 1:36.77 STOPPED, 1:39.54 'and I started', 1:41.38 DANCING; 2:12.64 'just light', 2:13.10 'so bright', 2:14.01 'I'm not the same'; 2:20.89 'together'; 2:25.44 'I'M COMING BACK'; 2:33.67 'to feel everything'; 2:53.73 'my heart stopped', 2:56.45 'and I started', 2:57.38 'dancing'; 3:01.02 MY HEART / STOPPED, 3:03.74 AND I STARTED, 3:05.56 DANCING.
+- Tom's ear-check (2026-10-15): music and graphics hit; the rest of the word timings are good enough except "Clear!" and "No pain, no fear, no clock, no name", which were up to 0.75 s early. Those cues are now measured from the vocal instead of snapped to the beat (the groove cancelled bar by bar, then the vowel track read per word): Clear! 65.33 (was 64.946), NO PAIN / NO FEAR / NO CLOCK / NO NAME on each sung "no" at 128.72, 129.62, 130.32, 130.95 (were 128.06, 128.96, 129.89, 130.81). `python3 analysis/word_onsets.py <t0> <t1>` prints the voice power and vowel balance for any window, for the next words that need measuring.
+- Open notes from the section builders, for Tom's review of the preview: P1 could sit 40 px higher so more faces show inside the FLATLINE letters (s_drop.tsx POSTER.cy 480 to 440); about 3 near-black frames at 1:44.9 as the DANCING zoom passes the N–C gap (s_dancing.tsx ZMAX); P49 (Maya in the keepsake) and P54 (the sleepers) could print darker with print_plates.py P-dict entries; the HR readout follows the grid tempo beat to beat (129/132).
+
+## Status at the earlier handoff (2026-10-13)
+- Tom on the full first cut: "This is mediocre at best. My idea for the images made everything look AI generated. Too many of the photos are repeated over and over." The 0:00–1:24 phone opening was liked; drop 1 to the end card needs a new treatment.
+- Superseded below: the stills are no longer made by Tom in his own tool. Claude generates them on Runway (scripts/runway_stills.py, model nano_banana_2.1, 6 credits each, about 270 credits left) and sends Tom JPEGs; api.dev.runwayml.com and dnznrvs05pmza.cloudfront.net are both allowed now, and the Drive tools work.
+- Images so far: M0 (reference, not in the edit), S1–S6 and R3–R14 (19; R1 and R2 were generated and cut). Tom lifted the 20-image cap on 2026-10-13: generate as many as the video needs, quoting the count and cost (nano_banana_2.1, 6 credits each, about 270 credits left) before each batch.
+- The "editorial fashion photographer, Edison-bulb loft" style in docs/image-prompts.md is what Tom called AI-looking; don't reuse it as is.
+- A new container has no media: download Flatline.mp3 and the stills from the Drive folder (Tom uploads the JPEGs he was sent).
+
+## Second-half treatments (2026-10-13)
+After Tom's verdict, three treatments for 1:24.8 to the end card were pitched, prototyped and judged side by side by three critics (taste, music-video craft, buildability):
+- **Print, "Proof of Life"** (src/proto/print, scored 7/7/7, recommended). Maya's world turns to paper after the shatter: every still is printed live in two inks (orange = real life, ultramarine = screen world, TokTic lime only on the app's own things) on cream newsprint, each still used once, never shown as a glossy photo. Highlights: DANCING letter windows onto R3; S5 printed cold and warmed by one stencil per phone going down; the S1/R12 zine diptych at 2:52; the press stopping half-printed on "Still" and the dots blowing off on 3:16.46. Risks: the jump from the dark opening to cream paper, a long orange/black stretch, 16 stills (cut S2, S3, R11 to get to about 12), halftone shimmer after compression.
+- **Monitor** (src/proto/monitor, 5/5/6). The heart-monitor line is the protagonist; the real world only through shapes it cuts. Best quiet moments (STOPPED with HR 0, six-lane ward monitor, the R12 eyelid), but energy runs backwards on the drops and people are barely on screen.
+- **Uninstall** (src/proto/uninstall, 3/4/3). Rejected: stills shown clean and glossy again. Its drop-1 hand-over (TokTic parts dancing out of the shattered phone on the beat, bars 46–48) is the best of the three and is the recommended graft into Print.
+- Recommended grafts into Print: Uninstall's drop-1 hand-over (paper arrives on the 1:32 "Flatline"); Monitor's real "stopped" (flat rule, HR 0, then HR counting up to the live tempo); a battery charging one ink cell per beat in drop 3 in place of the unreadable R6 phone-door table.
+- Print is now src/print (built 2026-10-14/15); its plates are made by `python3 src/print/tools/print_plates.py` (numpy, Pillow) into public/plates, and its fonts come from the @fontsource packages. Monitor's effects tools (OpenCV, Hershey font) were installed only in a scratch folder. Each prototype has its own entry: `FRAMES_ENTRY=src/proto/<name>/index.ts node scripts/frames.mjs Proto<Name> <outDir> 0.5 <seconds...>`.
+- **Decision (Tom, 2026-10-13): build Print ("Proof of Life")** with the three grafts above, into the main composition Flatline0, using src/proto/print as the base. New stills must look like real candid phone photos taken by friends in a nice place, never AI-looking or editorial (see the new style at the top of docs/image-prompts.md). Images start over (Tom, 2026-10-13): a new set planned from scratch for Print, as many as needed, in a real candid phone-photo style in nice places, never AI-looking or editorial (see the top of docs/image-prompts.md); the old S/R stills are reference only and the opening's stills may be replaced too. Propose the shot list with costs and show a small test batch first. Defaults unless Tom says otherwise: each image used once, no repeats; 16:9 first and the 9:16 after Tom approves the 16:9. Monitor and Uninstall stay in src/proto only as references for the grafts.
+- Still open with Tom: ear-checking lyric cues placed on bar lines; when to build the 9:16.
+- **Later on 2026-10-13 (Tom):** "Don't use the previous photos. They look too AI generated. Recreate the prompts and images to make the video look like a world-class motion graphics designer and photographer and music video artist would make it." And: "You can even change the story if you need to. I'm leaving this to your judgement. Make sure there are lots of cuts and changes to keep the user's attention. This is an ADHD audience."
+  - Nothing from the old image set is used, the opening's stills included. Maya gets a new identity reference in the real-photo style (M1), and M1 is the reference for every Maya shot.
+  - M0 is lost: it was never put in Drive, its Runway task ID was never saved (it came from a one-off model-comparison script), and Tom no longer has the copy he was sent. M1 is made from Maya's written description (Decisions, item 2) and Tom approves her face in the test batch before any other Maya shot is generated.
+  - Pacing: a visual change at least every 2 beats almost everywhere and every beat in the drops, with only short, deliberate holds.
+- **2026-10-14:** Tom approved the shot list and asked for production with image generation under $20. All 83 stills are generated (M1, C1, O1-O27, P1-P54); a realism review then flagged red cups, beer bottles and cans (Tom: remove them) plus some lettering and logos, fixed with 37 in-place edits. Runway spend so far: 720 credits ($7.20). Tom also asked for O7 to push in on Maya between Jess and Dev (done in code, src/opening/ScreenScenes.tsx KaiPhoto).
+- **Shot list proposed (2026-10-13, approved 2026-10-14):** docs/shot-list.md (the story, the places, a cut plan with 347 visual changes, and an index of 83 images: 2 references, 27 for the opening, 54 for Print) and docs/image-prompts.md (every prompt). 83 images plus a 10% retake reserve is 92 × 6 = 552 credits, which is 282 more than the 270 left; the references plus the test batch (36 credits) fit now.
+
 ## Where things are
 - Google Drive folder (Claude's working folder): 1S4kGIm8W8tyQuCnGBZNV8zWEq3DYxMqJ
   - Flatline.mp3: 1YQoac_93cuQ0tZYHAwsNbaOykf0kOfmE (the link Tom first sent, 1NU72tFT..., is "It Was You.mp3")
@@ -88,15 +124,18 @@ Implications:
 
 ## 0% treatment (decided): Maya, 19, lives through her phone; the battery dies; she looks up and comes alive
 - Core trick: the first half plays as a phone screen recording (motion graphics UI). The phone frame shatters into full screen at the 1:24 "Flatline".
-- After the breakout, the real world is a flash "photo dump" of AI stills cut to the beat.
-- Use a fictional app called "LOOP". No real Instagram, TikTok or Apple UI or logos.
+- After the breakout, the real world is a run of AI stills cut to the beat.
+  - Revised by Tom on 2026-10-13: the stills should look like a top music-video photographer shot them. Stylish, light and beautiful; never trashy party snaps.
+  - Each still moves (Ken Burns push or drift, parallax or light leaks where they suit). The `KenBurns` component is in src/ui/Worlds.tsx.
+  - Every shot with a group includes at least one Black, one East Asian and one South Asian (Indian) young adult in a diverse, attractive cast.
+- Use a fictional app called "TokTic" (Tom, 2026-10-13: a deliberate jab at TikTok; "LOOP" was dropped because it is a real app). No real Instagram, TikTok or Apple UI or logos, and keep TokTic's colours away from TikTok's cyan/red/black.
 - End card: "You don't have to die to wake up." Project Profound. Add 3–4 s after 3:32.
 - Formats: 16:9 master (phone frame in the center, expanding at the breakout) plus a 9:16 vertical. Cutdowns: 15 s (0:45–1:36) and 30 s.
 - Image style anchors:
   - Screen world: "cinematic, cold blue phone-screen light, shallow depth of field, 35mm"
-  - Real world: "disposable camera flash photo, party candid, warm, grainy, motion blur, Gen Z photo dump aesthetic"
+  - Real world (revised 2026-10-13): editorial music-video still by a top fashion photographer, warm Edison-bulb light and haze in an elegant industrial loft, light and joyful, fine film grain. The full wording is in docs/image-prompts.md.
   - Keep Maya's face mostly from behind, in profile or blurred, so she stays consistent.
-- Images: up to 20, about 16 planned:
+- Images (original plan, superseded: there is no longer a cap):
   - Screen world: face lit blue by the phone; party seen through the camera; 4 feed thumbnails; five friends on a couch lit by phones; her reflection in a cracked black screen.
   - Real world: friends laughing mid-dance; living-room dance floor with string lights; her from behind with hair flying; friends shouting the lyrics; confetti; table of face-down phones; group selfie taken by someone else; hands up in bokeh; spin with a light trail; rooftop at dawn; phone face-down on a ledge at sunrise.
 
@@ -118,7 +157,7 @@ Implications:
 | 0:44–1:01 | build | Scroll accelerates into a tunnel; battery steps down once per bar. 0:49 "Every beat a spark": each beat flashes a post. 0:55 "drum's on fire": a huge pulsing heart (like) icon and a red 1%. |
 | 1:01–1:05 | fade | The screen dims and glitches. |
 | 1:05 | "Clear!" | The screen cracks: 0%. Black. |
-| 1:05–1:24 | instrumental | 1:05–1:08 her reflection in the dead glass. 1:08–1:17 she looks up and the party fades in, out of focus. 1:17–1:21 (riser) focus sharpens and the frame edges crack. 1:21–1:24 (kick out) hold on her face, eyes up. |
+| 1:05–1:24 | instrumental | 1:05–1:08 her reflection in the dead glass. 1:08–1:17 out-of-focus photos of the room flip past every 2 beats (revised by Tom on 2026-10-13: one long blur-to-focus shot was too long). 1:17–1:21 (riser) flips every beat and the frame edges crack. 1:21–1:24 (kick out) her face comes into focus and holds. |
 | 1:24 | "Flatline" | FLATLINE slams on screen and the frame shatters. |
 | 1:25–1:36 | drop 1 | Full-screen flash photo dump, one photo every 2 beats. 1:32 "Flatline": white strobe plus type. |
 | 1:36–1:54 | "My heart stopped... and I started dancing" | Huge kinetic type. She dances for the first time. |
@@ -152,8 +191,8 @@ Implications:
 
 ## Decisions (Tom, 2026-10-13)
 1. Images: Tom generates them himself from Claude's prompts and uploads them to the Drive folder.
-2. Maya: 19, black shoulder-length hair, modern club clothing, a dark, edgy, confident look. Keep the prompts stylish and tasteful, not sexualized; she's a young adult.
-   - LOOP app colors: Claude proposes them.
+2. Maya: 19, European, slim, high cheekbones, large almond-shaped light grey-green eyes, straight dark brows, long tousled chestnut-to-caramel hair, modern dark club clothing, a calm, intense, confident look (from a look reference Tom shared on 2026-10-13, after earlier takes kept coming out East Asian; the reference's revealing dress is deliberately not copied). Keep the prompts stylish and tasteful, not sexualized; she's a young adult.
+   - TokTic app colors: Claude proposed them in docs/image-prompts.md (acid lime accent).
 3. Repo: Tom wants a new PRIVATE repo called "flatline" (GitHub account masterytv, a personal account).
    - Done: Tom created it, and Claude attached it with add_repo (access push) on 2026-10-13.
    - Never put mp3, images or rendered video in git: add them to .gitignore and keep media in Drive.
@@ -165,15 +204,30 @@ Implications:
 - Check in a new session (prints names only, never the value): `env | cut -d= -f1 | grep -i runway`, then `curl -sS -o /dev/null -w "%{http_code}" https://api.dev.runwayml.com/v1/organization -H "Authorization: Bearer $VAR" -H "X-Runway-Version: 2024-11-06"`. A 200 means it works; that endpoint also reports the credit balance and costs nothing.
 - Intended use: generating the stills (Runway's text-to-image model, which can take reference images to keep Maya consistent). Tom ruled out AI video on cost, so don't generate video unless he asks. Confirm the image count and cost with Tom before the first paid batch.
 - Generated images may download from a different host than the API. If that host is blocked, name it to Tom so he can allow it too.
+- 2026-10-13: Tom approved generating the stills on Runway. Generation itself works (the M0 test cost 8 credits at 1920:1080), but the images download from dnznrvs05pmza.cloudfront.net, which the network policy blocks (proxy 403). Tom needs to add it under Allowed domains. The first M0 render was lost because its task ID wasn't saved.
+- Script: scripts/runway_stills.py (M0 first, then `all`; it uses media/stills/M0.* as the @maya reference for shots with Maya, records task IDs in media/stills/tasks.json, and `--fetch` re-downloads finished tasks without new credits).
 
 ## Next steps (in order)
-1. Write the image prompts: about 16, in the two style anchors above, with Maya as described. Save them to Drive as a Google Doc and to the repo as docs/image-prompts.md, so Tom can start generating.
-2. Scaffold the Remotion project:
-   - Copy in the beat grid JSON and the lyric markers.
-   - Point browserExecutable at /opt/pw-browsers/chromium-1194 (check the exact binary path).
-   - Use local fonts (@fontsource via npm).
-3. Test render of the screen-world opening (0:00–1:24): phone UI, notifications, battery, scroll tunnel, crack. It needs no images. Send Tom a low-res preview with SendUserFile.
-4. When the images arrive: download from Drive (base64 tool-results file), then build the photo-dump and real-world sections.
+1. Done (2026-10-13): image prompts, 17 stills plus a Maya reference. In the repo as docs/image-prompts.md and in Drive as the Google Doc "Flatline – 0% Image Prompts" (1n0Qnq3TwnBmtrLEqdNqWC6S2q1CrfvtV3R4TIwwuiCQ).
+2. Done (2026-10-13): Remotion scaffold (see "Remotion build" below).
+3. Done (2026-10-13): first test render of the screen-world opening, 0:00 to 1:26.6 (it runs to the downbeat after the breakout so the shatter plays out). Images are procedural stand-ins. Waiting on Tom's notes.
+4. Done (2026-10-13): all 17 stills generated on Runway with nano_banana_2.1 (Tom's pick, 6 credits each at 2752:1536), with M0 as the reference for the Maya shots. R6 was retaken once (the first take showed an Apple logo and face-up phones). Sent to Tom as full-resolution JPEGs for the Drive folder; the Drive tools can't upload images. Runway balance after: 348 credits.
+   - A new session has no media: download the stills from Drive into media/stills/ and copy them to public/stills/ as <ID>.png or .jpg (git-ignored).
+   - Restyle (Tom, 2026-10-13): R1 and R2 cut; S2, S5 and R3–R10 regenerated in the editorial style with the diverse cast (60 credits). The first-round images are in media/stills/v1/. Drop 1 now opens on R8. Small leftovers: beer bottles on the R10 rooftop; a light phone screen in S2. Balance after: 288 credits.
+5. Done (2026-10-13): first full build of drop 1 onwards, as the composition `Flatline0` (whole song plus end card) and `Flatline0Vertical`. Three more stills (R12–R14) were generated for the Maya moments (18 credits; 270 left; 18 of 20 images used). Waiting on Tom's notes.
+6. Done (2026-10-15): Tom approved the 16:9 and the 9:16 is built (see the status at the top). Next: Tom's notes on the 9:16 preview; check the lyric sync (the heart section and the repeats at 2:52 and 3:00 are placed on bar lines, not on measured vocal times); the 15 s and 30 s cutdowns; final 1080p renders (16:9 and 9:16).
+
+## Remotion build
+- Commands: `npm install`, then `npm run studio` (live preview), `npm run typecheck`, `npm run render:opening-preview` (960×540) or `npm run render:opening` (1920×1080). The vertical version is the composition `ScreenOpeningVertical` (1080×1920). Add `--props='{"debug":true}'` for a timecode and bar counter in the corner.
+- Chromium: remotion.config.ts points at /opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell.
+- Song: download Flatline.mp3 from Drive into media/ and copy it to public/Flatline.mp3 (both git-ignored; a relative symlink breaks when Remotion copies public/). Without it, the render is silent.
+- Stills: put Tom's images in public/stills/ as <ID>_<name>.jpg/png/webp (e.g. S1_face_blue.png). `Still` in src/ui/Worlds.tsx uses the file when it exists and a procedural stand-in when it doesn't. public/stills is git-ignored via the image extensions.
+- After adding or replacing stills, run `npm run stills:small`. It makes 1280px copies in public/stills/small/, which the feed thumbnails and the blurred flips use so renders stay fast.
+- Timing: src/timing.ts reads the beat grid; src/opening/cues.ts holds every cue in the 0:00–1:24 shot list, each snapped to the beat nearest Tom's lyric time, plus the battery schedule (23% → red 20% at 0:04 → 10% at the break → one step per bar → 1% at 0:55 → 0% at "Clear!").
+- Full video: src/full/cues.ts holds every cue from drop 1 to the end card (lyric cues snapped to the beat, sections on bar lines). src/full/Flatline0.tsx is the master timeline: the opening until the downbeat after the shatter, then the photo runs, kinetic type and moments. src/full/kit.tsx has the photo-cut engine (`cutsEvery` gives each cut its own Ken Burns move and a tighter crop on repeats), light leaks, strobes, flashes, confetti and the kinetic type. src/full/moments.tsx has the motion-graphics moments: phones down (glows on S5), "No pain..." UI bursts, 4:00 → ∞, the charger and notification flood, the phone flip, the screen-time card and the end card.
+- Renders: `npm run render:full-preview` (960×540), `npm run render:full` and `npm run render:vertical` (full size). `node scripts/frames.mjs <Composition> <outDir> <scale> <seconds...>` renders chosen frames as PNGs for quick checks.
+- Print (1:24.8 to the end): src/print/Print.tsx is the timeline (one section per bar or lyric cue); each s_*.tsx file holds a group of sections; halftone.ts/Press.tsx/density.ts are the halftone press; kit.tsx has the shared print parts. To check one section on its own: `FRAMES_ENTRY=src/print/dev/<group>.ts node scripts/frames.mjs PrintDev out/frames/<group> 0.5 <seconds...>` (and src/opening/dev.ts for the opening).
+- Code map: src/opening/ScreenScenes.tsx (phone-screen scenes), src/opening/ScreenOpening.tsx (room, frame cracks, FLATLINE slam, shatter), src/ui/ (phone, status bar, TokTic logo, notifications, stand-in worlds), src/theme.ts (TokTic palette).
 
 ## Other context
 - Ageless (Rose and Walter) is the second video, planned for later. Its shot list is in the v2 Google Doc.

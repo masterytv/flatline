@@ -1,0 +1,37 @@
+{
+  "name": "flatline",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Motion-graphics music videos for \"Flatline\" (Remotion)",
+  "scripts": {
+    "studio": "remotion studio",
+    "stills:small": "python3 scripts/make_small_stills.py",
+    "typecheck": "tsc --noEmit",
+    "render:full-preview": "remotion render Flatline0 out/flatline0-preview.mp4 --scale=0.5 --crf=26",
+    "render:full": "remotion render Flatline0 out/flatline0.mp4",
+    "render:vertical": "remotion render Flatline0Vertical out/flatline0-vertical.mp4",
+    "render:opening": "remotion render ScreenOpening out/opening.mp4",
+    "render:opening-preview": "remotion render ScreenOpening out/opening-preview.mp4 --scale=0.5 --crf=28",
+    "render:master": "remotion render Flatline0 out/flatline0-1080p.mp4 --crf=14 --image-format=png --x264-preset=slow --audio-bitrate=320k",
+    "render:master-vertical": "remotion render Flatline0Vertical out/flatline0-vertical-1080x1920.mp4 --crf=14 --image-format=png --x264-preset=slow --audio-bitrate=320k",
+    "render:youtube-4k": "remotion render Flatline0 out/flatline0-2160p.mp4 --scale=2 --crf=16 --image-format=png --x264-preset=slow --audio-bitrate=320k",
+    "render:youtube-4k-vertical": "remotion render Flatline0Vertical out/flatline0-vertical-2160x3840.mp4 --scale=2 --crf=16 --image-format=png --x264-preset=slow --audio-bitrate=320k",
+    "render:short-15": "remotion render Flatline0Vertical out/flatline0-short-15s.mp4 --frames=2765-3206 --crf=14 --image-format=png --x264-preset=slow --audio-bitrate=320k",
+    "render:short-30": "remotion render Flatline0Vertical out/flatline0-short-30s.mp4 --frames=2433-3317 --crf=14 --image-format=png --x264-preset=slow --audio-bitrate=320k"
+  },
+  "dependencies": {
+    "@fontsource/anton": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/instrument-serif": "5.3.0",
+    "@fontsource/inter": "5.2.6",
+    "@fontsource/space-grotesk": "5.2.8",
+    "@remotion/cli": "4.0.535",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.535"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.8",
+    "typescript": "5.8.3"
+  }
+}
