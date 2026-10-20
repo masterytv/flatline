@@ -2,7 +2,7 @@ import React, {useLayoutEffect, useRef} from 'react';
 import {AbsoluteFill, Img} from 'remotion';
 import {PAPER_URL} from './density';
 import {INK} from './ink';
-import {CAM0, Cam, drawSheet, Sheet, sheetMatrix} from './press';
+import {CAM0, Cam, drawSheet, Sheet, sheetMatrix} from './halftone';
 import {useStage} from './stage';
 
 /** A full-frame canvas that prints sheets through the camera (crisp at any zoom). Multiplies onto what is below. */

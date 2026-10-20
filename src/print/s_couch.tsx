@@ -6,7 +6,7 @@ import {Density, useDensities} from './density';
 import {hash2, INK, MONO, SERIF} from './ink';
 import {clamp01, CropMarks, easeIn, easeInOut, easeOut, ecg, FlatlineBar, inked, kickNudge, lerp, RegTarget, Rule, Slug, stamp} from './kit';
 import {bbox, FRIENDS, Friend, inPoly, P11_SPIN, P12_MAYA, P7_FACES, P7_HAND, P7_LAMP, P7_PALM, P7_PEOPLE, P7_PHONES, P7_PULL, P8_LAMP, P9_GAP, Poly} from './masks';
-import {Cam, Plate, plateDots, Sheet, sheetMatrix} from './press';
+import {Cam, Plate, plateDots, Sheet, sheetMatrix} from './halftone';
 import {CamLayer, Paper, Press} from './Press';
 import {ReverseSheetV} from './s_dancing';
 import {bleed, Frame, K_FILL, useStage, VH, VMap, vtrack, VW} from './stage';

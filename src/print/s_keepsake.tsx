@@ -4,7 +4,7 @@ import {bt} from '../timing';
 import {useDensities} from './density';
 import {hash2, INK, SERIF} from './ink';
 import {clamp01, easeOut, inked, lerp} from './kit';
-import {Sheet} from './press';
+import {Sheet} from './halftone';
 import {Press} from './Press';
 import {K_FILL, useStage} from './stage';
 

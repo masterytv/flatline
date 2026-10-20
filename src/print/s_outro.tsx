@@ -6,7 +6,7 @@ import {TokTicLogo} from '../ui/TokTicLogo';
 import {PAPER_URL, useDensities} from './density';
 import {ANTON, INK, MONO, SERIF} from './ink';
 import {clamp01, easeIn, easeInOut, easeOut, ecg, inked, lerp} from './kit';
-import {Cam, Plate, Sheet, sheetMatrix} from './press';
+import {Cam, Plate, Sheet, sheetMatrix} from './halftone';
 import {KeepsakePrint} from './s_keepsake';
 import {CamLayer, OnSheet, Paper, PaperFill, Press} from './Press';
 import {bleed, Frame, K_FILL, useStage, VMap, vtrack} from './stage';

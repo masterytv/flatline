@@ -5,7 +5,7 @@ import {BEATS, bt, lastBeatIndex} from '../timing';
 import {Density, useDensities} from './density';
 import {hash2, INK, SERIF} from './ink';
 import {clamp01, CropMarks, easeOut, inked, kickNudge, lerp, RegTarget, Rule, Slug, stamp} from './kit';
-import {Cam, Plate, plateDots, Sheet, sheetMatrix} from './press';
+import {Cam, Plate, plateDots, Sheet, sheetMatrix} from './halftone';
 import {CamLayer, Paper, Press} from './Press';
 import {KeepsakePrint} from './s_keepsake';
 import {Frame, K_FILL, useStage, VMap, vtrack} from './stage';

@@ -6,7 +6,7 @@ import {Density, useDensities} from './density';
 import {hash2, INK, MONO} from './ink';
 import {clamp01, easeIn, easeInOut, easeOut, ecg, FlatlineBar, inked, kickNudge, lerp, RegTarget, Slug, stamp} from './kit';
 import {bbox, FRIENDS, inPoly, P7_PHONES, Poly} from './masks';
-import {Cam, Plate, Sheet} from './press';
+import {Cam, Plate, Sheet} from './halftone';
 import {CamLayer, Paper, PaperFill, Press} from './Press';
 import {bleed, Frame, K_FILL, useStage, VMap, vtrack} from './stage';
 

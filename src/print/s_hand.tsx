@@ -7,7 +7,7 @@ import {beatsIn, bt} from '../timing';
 import {Density, PAPER_URL, useDensities} from './density';
 import {INK} from './ink';
 import {clamp01, easeInOut, easeOut, inked, kickNudge, lerp} from './kit';
-import {Cam, Plate, Sheet} from './press';
+import {Cam, Plate, Sheet} from './halftone';
 import {CamLayer, Paper, Press} from './Press';
 import {P1_PLATES, POSTER, posterSheet, sheetCam, SheetMarks, WIRE_Y} from './s_drop';
 import {MonoText, P, Part, PartShape, PartState} from './s_hand_parts';

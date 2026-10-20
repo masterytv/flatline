@@ -7,7 +7,7 @@ import {Density, useDensities} from './density';
 import {hash2, INK, MONO} from './ink';
 import {clamp01, easeIn, easeInOut, easeOut, ecg, inked, kickNudge, lerp, slap, stamp} from './kit';
 import {inPoly, Poly} from './masks';
-import {CAM0, Plate, Sheet, sheetMatrix} from './press';
+import {CAM0, Plate, Sheet, sheetMatrix} from './halftone';
 import {OnSheet, Paper, PaperFill, Press} from './Press';
 import {bleed, Frame, K_FILL, useStage, VMap, vtrack} from './stage';
 

@@ -6,7 +6,7 @@ import {Density, sample, useDensities} from './density';
 import {CAP, NO_LINES, O_COUNTER, O_ORIGIN, UPM} from './glyphs_groove';
 import {ANTON, hash2, INK, MONO, SERIF} from './ink';
 import {clamp01, CropMarks, easeIn, easeInOut, easeOut, inked, lerp, RegTarget, Rule, Slug, stamp, Tape} from './kit';
-import {Cam, CAM0, Plate, Sheet} from './press';
+import {Cam, CAM0, Plate, Sheet} from './halftone';
 import {CamLayer, Paper, PaperFill, Press, SheetCanvas} from './Press';
 import {bleed, Frame, K_FILL, K_FIT, useStage, VMap, vtrack} from './stage';
 
