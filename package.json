@@ -11,7 +11,11 @@
     "render:full": "remotion render Flatline0 out/flatline0.mp4",
     "render:vertical": "remotion render Flatline0Vertical out/flatline0-vertical.mp4",
     "render:opening": "remotion render ScreenOpening out/opening.mp4",
-    "render:opening-preview": "remotion render ScreenOpening out/opening-preview.mp4 --scale=0.5 --crf=28"
+    "render:opening-preview": "remotion render ScreenOpening out/opening-preview.mp4 --scale=0.5 --crf=28",
+    "render:master": "remotion render Flatline0 out/flatline0-1080p.mp4 --crf=14 --image-format=png --x264-preset=slow --audio-bitrate=320k",
+    "render:master-vertical": "remotion render Flatline0Vertical out/flatline0-vertical-1080x1920.mp4 --crf=14 --image-format=png --x264-preset=slow --audio-bitrate=320k",
+    "render:youtube-4k": "remotion render Flatline0 out/flatline0-2160p.mp4 --scale=2 --crf=16 --image-format=png --x264-preset=slow --audio-bitrate=320k",
+    "render:youtube-4k-vertical": "remotion render Flatline0Vertical out/flatline0-vertical-2160x3840.mp4 --scale=2 --crf=16 --image-format=png --x264-preset=slow --audio-bitrate=320k"
   },
   "dependencies": {
     "@fontsource/anton": "5.3.0",
